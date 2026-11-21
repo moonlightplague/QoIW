@@ -54,12 +54,16 @@ void round_trip(BoundCase selection) {
 
     for (auto name : {"mock:identity", "mock:quantizer", "mock:noise", "mock:garbage", "mock:signflip", "mock:nan"}) {
         const auto& core = qoiw::test::mock_core(name);
-        const auto prep = prepare_pointwise(dtype, original.data(), bytes, spec, core.traits(dtype, dims.size()),
-                                            2, fixed_bound, options);
+        const auto prep = prepare_pointwise(dtype, original.data(), bytes, dims, spec, core.traits(dtype, dims.size()),
+                                            2, fixed_bound, options, {.01, 16, 16, 2, 4});
         const auto& request = prep.resolved.request;
         qoiw::CoreParams params;
         if (selection == BoundCase::Candidates) {
-            const auto& candidates = std::get<PointPrior>(prep.decision).candidates;
+            const auto& search = std::get<PointSearch>(prep.decision);
+            if (search.sample.layout.dims != std::vector<std::uint64_t>{13, 13} ||
+                std::get<std::vector<std::vector<T>>>(search.sample.blocks).size() != 2)
+                throw std::runtime_error("expected two 13 x 13 blocks from the original field");
+            const auto& candidates = search.prior.candidates;
             if (candidates.empty()) throw std::runtime_error("expected positive candidate bounds");
             params.bound = candidates.back();
         } else {
