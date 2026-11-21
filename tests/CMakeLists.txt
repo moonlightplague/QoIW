@@ -47,3 +47,8 @@ add_executable(qoiw_test_lossless unit/backend/lossless.cpp)
 qoiw_configure_target(qoiw_test_lossless)
 target_link_libraries(qoiw_test_lossless PRIVATE QOIW::qoiw)
 add_test(NAME backend.lossless COMMAND qoiw_test_lossless)
+
+add_executable(qoiw_test_pointwise unit/backend/pointwise.cpp)
+qoiw_configure_target(qoiw_test_pointwise)
+target_link_libraries(qoiw_test_pointwise PRIVATE QOIW::qoiw)
+add_test(NAME backend.pointwise COMMAND qoiw_test_pointwise)

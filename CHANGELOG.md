@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### M1 point-wise correction pass
+
+- Compare the core's decoded field against resolved data and QoI tolerances and an optional exact condition. Encode violations in increasing index order and apply the resulting lossless layer to the reconstruction.
+
 ### M1 lossless corrections
 
 - Store optional per-field LOSSLESS sections and restore their values after core decompression in the decode library. Preserve the existing core-only wire fixtures.
