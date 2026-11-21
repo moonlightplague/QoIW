@@ -6,8 +6,9 @@ single-variable expression engine, a sectioned container, and a lossless
 correction layer that restores selected values after core decompression.
 The encoder resolves point-wise tolerances from the original field and checks
 them against the core reconstruction. The frontend generates candidate
-compressor bounds and can select one when a shortcut applies.
-Sample-based tuning, the SZ3 adapter, and the CLI are in development for M1.
+compressor bounds and can select one when a shortcut applies. Other requests
+get a sample of the field for tuning. Candidate measurement and search, the
+SZ3 adapter, and the CLI are in development for M1.
 [Development plan](PLAN.md)
 
 ## Build and test
@@ -161,6 +162,27 @@ Frontend step F2 can supply a compressor bound in three cases.
 
 Other requests retain the prior and its candidates for measured tuning.
 Every path returns the resolved request for full-field verification.
+
+### Sampling blocks for measured tuning
+
+F3 selects blocks from the original field in C order. The default sampling
+rate is 1%. Each dimension is divided into nearly equal tiles, and a Halton
+sequence selects tile coordinates using bases 2, 3, 5, and 7. The last tile
+shifts back when necessary to fit a full block. Block order is deterministic
+across thread counts.
+
+| Field rank | Default block edge | Minimum edge | Block count |
+| --- | ---: | ---: | ---: |
+| 1 | 262144 | 262144 | 5–64 |
+| 2 | 512 | 128 | 12–64 |
+| 3 | 64 | 64 | 5–64 |
+| 4 | 24 | 24 | 5–64 |
+
+If the planned blocks would cover at least half the input by element count,
+F3 copies the whole field as a single block and records that choice. The
+sample owns the original float32 or float64 bits. On the Hurricane reference
+field of shape `100 × 500 × 500`, the defaults select five `50 × 63 × 63` blocks,
+matching QPET's locations and all 992,250 sampled values. [QPET license](LICENSES/QPET.txt)
 
 ## Reference benchmarks
 

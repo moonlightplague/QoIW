@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### M1 point-wise block sampling
+
+- Prepare blocks alongside the full-field prior for requests that need measurement. Validate the input shape before resolution and skip sampling for all three bound shortcuts.
+- Copy the selected float32 or float64 blocks into owned arrays in C order, preserving signed zeros and NaN payloads across thread counts.
+- Select deterministic C-order sample blocks with QPET's Halton sequence and rank-specific defaults. Use the whole field when the planned sample reaches half the input.
+
 ### M1 point-wise bound shortcuts
 
 - Verify fixed and zero-radius shortcuts through all six mock cores, lossless correction, and a fresh container decode for both storage types. Document the bounds used in each case.
