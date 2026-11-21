@@ -48,7 +48,7 @@ Stream read_header(ByteReader& input) {
     if (body.u8() != 0) throw UnsupportedFormat("unknown header extension");
     if (ndims == 0 || ndims > 4 || nfields == 0) throw CorruptStream("invalid rank or field count");
     for (unsigned i = 0; i < ndims; ++i) stream.dims.push_back(body.u64());
-    if (!valid_shape(stream.dtype, stream.dims)) throw CorruptStream("invalid array type or dimensions");
+    if (!common::array_bytes(stream.dtype, stream.dims)) throw CorruptStream("invalid array type or dimensions");
 
     stream.wrapper_version = read_string(body);
     stream.core_name = read_string(body);

@@ -19,3 +19,15 @@ foreach(part reader writer)
 endforeach()
 target_link_libraries(qoiw_test_container_reader PRIVATE qoiw_decode)
 target_link_libraries(qoiw_test_container_writer PRIVATE QOIW::qoiw)
+
+add_library(qoiw_mock_cores STATIC ../src/core/adapters/mock.cpp)
+qoiw_configure_target(qoiw_mock_cores)
+target_link_libraries(qoiw_mock_cores PRIVATE QOIW::qoiw)
+
+find_package(Threads REQUIRED)
+add_executable(qoiw_test_mock_roundtrip cores/mock_roundtrip.cpp)
+qoiw_configure_target(qoiw_test_mock_roundtrip)
+target_link_libraries(qoiw_test_mock_roundtrip PRIVATE qoiw_mock_cores QOIW::qoiw Threads::Threads)
+target_compile_definitions(qoiw_test_mock_roundtrip PRIVATE
+    QOIW_MOCK_GOLDEN="${CMAKE_CURRENT_SOURCE_DIR}/golden/m0-mock-quantizer.qoiw")
+add_test(NAME core.mock_roundtrip COMMAND qoiw_test_mock_roundtrip)
