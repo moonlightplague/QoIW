@@ -30,6 +30,11 @@ cmake --build build --parallel
 | `QOIW_WARNINGS_AS_ERRORS=ON` | Treat QoIW warnings as errors under GCC and Clang. |
 | `QOIW_SANITIZE=address`, `undefined`, or `thread` | Instrument a build with one sanitizer. The default is `none`. |
 
+The encoder uses OpenMP when available. Configure with
+`-DCMAKE_DISABLE_FIND_PACKAGE_OpenMP=ON` for a serial build. The
+ThreadSanitizer job uses Clang and LLVM Archer so the race detector observes
+OpenMP synchronization. [LLVM Archer documentation](https://github.com/llvm/llvm-project/blob/release/18.x/openmp/tools/archer/README.md)
+
 The common tests use known byte sequences and the CRC32C check value for
 `123456789`. The container tests cover a fixed wire fixture, truncated inputs,
 and multi-field round trips. With SZ3 enabled, a separate test builds against its public C++ API
