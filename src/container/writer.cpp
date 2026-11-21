@@ -69,6 +69,12 @@ std::vector<std::uint8_t> write(const Stream& stream) {
         if (field.core_stream.size && !field.core_stream.data) throw std::invalid_argument("null CORE payload");
         if (field.core_stream.size > limit - size) throw std::length_error("container exceeds vector capacity");
         size += field.core_stream.size;
+        if (field.lossless.size) {
+            if (!field.lossless.data) throw std::invalid_argument("null LOSSLESS payload");
+            if (limit - size < 12 || field.lossless.size > limit - size - 12)
+                throw std::length_error("container exceeds vector capacity");
+            size += 12 + field.lossless.size;
+        }
     }
     output.reserve(size);
     ByteWriter writer(output);
@@ -80,7 +86,10 @@ std::vector<std::uint8_t> write(const Stream& stream) {
     writer.bytes(body.data(), body.size());
     writer.u32(common::crc32c(body.data(), body.size()));
     for (std::size_t i = 0; i < stream.fields.size(); ++i) {
-        write_section(writer, Section::Core, static_cast<std::uint8_t>(i), stream.fields[i].core_stream);
+        const auto id = static_cast<std::uint8_t>(i);
+        const auto& field = stream.fields[i];
+        write_section(writer, Section::Core, id, field.core_stream);
+        if (field.lossless.size) write_section(writer, Section::Lossless, id, field.lossless);
     }
     write_section(writer, Section::End, 0, {});
     return output;

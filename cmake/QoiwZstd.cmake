@@ -1,0 +1,31 @@
+option(QOIW_FETCH_DEPS "Fetch pinned dependencies when system packages are unavailable" OFF)
+
+find_package(zstd 1.4 CONFIG QUIET)
+if(TARGET zstd::libzstd_shared)
+    set(QOIW_ZSTD_TARGET zstd::libzstd_shared)
+elseif(TARGET zstd::libzstd_static)
+    set(QOIW_ZSTD_TARGET zstd::libzstd_static)
+else()
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(QOIW_SYSTEM_ZSTD QUIET IMPORTED_TARGET libzstd>=1.4)
+    endif()
+    if(TARGET PkgConfig::QOIW_SYSTEM_ZSTD)
+        set(QOIW_ZSTD_TARGET PkgConfig::QOIW_SYSTEM_ZSTD)
+    elseif(QOIW_FETCH_DEPS)
+        include(FetchContent)
+        set(ZSTD_BUILD_PROGRAMS OFF)
+        set(ZSTD_BUILD_TESTS OFF)
+        set(ZSTD_BUILD_SHARED OFF)
+        set(ZSTD_BUILD_STATIC ON)
+        FetchContent_Declare(qoiw_zstd
+            GIT_REPOSITORY https://github.com/facebook/zstd.git
+            GIT_TAG v1.5.6
+            GIT_SHALLOW TRUE
+            SOURCE_SUBDIR build/cmake)
+        FetchContent_MakeAvailable(qoiw_zstd)
+        set(QOIW_ZSTD_TARGET libzstd_static)
+    else()
+        message(FATAL_ERROR "QoIW requires zstd >= 1.4. Install its development package or enable QOIW_FETCH_DEPS.")
+    endif()
+endif()

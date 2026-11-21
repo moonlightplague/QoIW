@@ -83,6 +83,14 @@ void sections(const Buffer& golden_bytes) {
     bytes.insert(bytes.begin() + kEnd, golden_bytes.begin() + kCore, golden_bytes.begin() + kEnd);
     expect_error<CorruptStream>([&] { fixture::read(bytes); }, "duplicate CORE accepted");
 
+    bytes[kEnd] = 0x11;  // A required, field-specific LOSSLESS payload.
+    const auto layer = fixture::read(bytes).fields[0].lossless;
+    check(layer.data == bytes.data() + kEnd + 12 && layer.size == 3, "borrowed LOSSLESS range");
+    reject_byte(bytes, kEnd + 1, 1);
+    reject_byte<UnsupportedFormat>(bytes, kEnd + 2, 1);
+    auto duplicate = bytes;
+    duplicate.insert(duplicate.begin() + kEnd, bytes.begin() + kEnd, bytes.begin() + kEnd + 15);
+    expect_error<CorruptStream>([&] { fixture::read(duplicate); }, "duplicate LOSSLESS accepted");
     bytes[kEnd] = 0x7e;  // Known informational NOTE.
     fixture::read(bytes);
     bytes[kEnd] = 0x81;

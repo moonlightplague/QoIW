@@ -64,6 +64,23 @@ void invalid(Edit edit, const char* message) {
     expect_error<std::invalid_argument>([&] { write(stream); }, message);
 }
 
+void reordered_corrections() {
+    auto stream = sample();
+    static constexpr std::uint8_t layer[] = {0x51, 0x52};
+    stream.fields.push_back(Field{});
+    stream.fields[1].lossless = {layer, sizeof(layer)};
+    const auto bytes = write(stream);
+    auto reordered = bytes;
+    auto end = reordered.end() - 12;
+    auto correction = end - 14;
+    // Move field 1's LOSSLESS ahead of both CORE sections.
+    std::rotate(correction - 12 - 15, correction, end);
+    auto back = fixture::read(reordered);
+    check(back.fields[0].lossless.size == 0 && back.fields[1].lossless.size == sizeof(layer),
+          "LOSSLESS assigned to wrong field");
+    check(write(back) == bytes, "reordered LOSSLESS changed payload");
+}
+
 void invalid_inputs() {
     invalid([](Stream& s) { s.dims = {}; }, "empty dimensions accepted");
     invalid([](Stream& s) { s.dims = {UINT64_MAX}; }, "array byte count overflow accepted");
@@ -75,9 +92,14 @@ void invalid_inputs() {
             "NaN data bound accepted");
     invalid([](Stream& s) { s.fields[0].decode_params.size = UINT32_MAX; }, "header size overflow accepted");
     invalid([](Stream& s) { s.fields[0].core_stream = {nullptr, 1}; }, "invalid borrowed payload accepted");
+    invalid([](Stream& s) { s.fields[0].lossless = {nullptr, 1}; }, "null LOSSLESS payload accepted");
     auto oversized = sample();
     oversized.fields[0].core_stream.size = std::numeric_limits<std::size_t>::max();
     expect_error<std::length_error>([&] { write(oversized); }, "total stream size overflow accepted");
+    oversized = sample();
+    oversized.fields[0].lossless = oversized.fields[0].core_stream;
+    oversized.fields[0].lossless.size = std::numeric_limits<std::size_t>::max();
+    expect_error<std::length_error>([&] { write(oversized); }, "LOSSLESS size overflow accepted");
     std::string too_long(65536, 'a');
     invalid([&](Stream& s) { s.fields[0].name = too_long; }, "unrepresentable string length accepted");
 }
@@ -86,6 +108,7 @@ void invalid_inputs() {
 int main() {
     try {
         round_trip();
+        reordered_corrections();
         invalid_inputs();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

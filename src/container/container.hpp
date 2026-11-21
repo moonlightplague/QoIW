@@ -20,6 +20,7 @@ struct Field {
     Bytes decode_params;
     std::uint64_t fingerprint = 0;
     Bytes core_stream;
+    Bytes lossless{};  // Absent when no indices need correction.
 };
 
 // Strings and byte ranges borrow their storage. For read(), keep the source

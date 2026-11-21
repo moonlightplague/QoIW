@@ -1,16 +1,17 @@
 # QoIW
 
 QoIW is a C++17 wrapper under development for preserving quantities of interest
-when compressing fixed-grid scientific arrays. M0 includes the build, SZ3 dependency integration,
-binary I/O, a container for streams with zero QoI targets, test-only mock cores,
-and a single-variable expression engine. The compression pipeline and CLI are
-planned for M1. [Development plan](PLAN.md)
+when compressing fixed-grid scientific arrays. The libraries include a
+single-variable expression engine, a sectioned container, and a lossless
+correction layer that restores selected values after core decompression.
+Point-wise outlier selection, the SZ3 adapter, and the CLI are planned for M1.
+[Development plan](PLAN.md)
 
 ## Build and test
 
-Use CMake 3.19 or newer and a C++17 compiler. The default build uses the pinned
-SZ3 submodule. On Linux, install the zstd development package to build SZ3
-against the system library.
+Use CMake 3.19 or newer, a C++17 compiler, and the zstd development package
+(1.4 or newer). The correction layer uses zstd in all builds. The default
+build also uses the pinned SZ3 submodule.
 
 ```sh
 git submodule update --init SZ3
@@ -24,6 +25,7 @@ cmake --build build --parallel
 | `QOIW_CORE_SZ3=OFF` | Build and test the libraries without SZ3. |
 | `QOIW_SZ3_SOURCE_DIR=/path/to/SZ3` | Use a compatible SZ3 source checkout. |
 | `QOIW_SZ3_USE_INSTALLED=ON` | Find the SZ3 3.4 CMake package. Use `CMAKE_PREFIX_PATH` for a custom install prefix. |
+| `QOIW_FETCH_DEPS=ON` | Fetch zstd 1.5.6 for the correction layer if system zstd is unavailable. |
 | `QOIW_BUILD_TESTS=OFF` | Build only the libraries. |
 | `QOIW_WARNINGS_AS_ERRORS=ON` | Treat QoIW warnings as errors under GCC and Clang. |
 | `QOIW_SANITIZE=address`, `undefined`, or `thread` | Instrument a build with one sanitizer. The default is `none`. |
@@ -33,17 +35,29 @@ The common tests use known byte sequences and the CRC32C check value for
 and multi-field round trips. With SZ3 enabled, a separate test builds against its public C++ API
 and calls its compressed-size bound function to check linkage.
 
-## M0 container
+## Container and lossless corrections
 
 The provisional version 0.0 stream carries C-order dimensions, per-field bounds,
 opaque decode parameters, fingerprint metadata, and one CORE section per field.
+It currently accepts requests with zero target records.
 The reader checks the header CRC32C before interpreting its contents. It returns
 views into the input buffer for strings and payloads, so callers must retain the
 buffer while using the parsed stream.
 
-The reader skips informational extensions and rejects unsupported correction
-layers. The format freeze is scheduled for M1 and decoded-value fingerprint
-verification for M3.
+A field with corrections also carries one required LOSSLESS section (type
+`0x11`, flags zero). The payload starts with two little-endian `u64` values
+giving the correction count and the compressed byte length of the index frame.
+Two zstd frames follow, each with its uncompressed size recorded. The first
+holds unsigned LEB128 gaps between increasing flat indices, starting with the
+absolute first index. The second holds the corresponding original float32 or
+float64 bit patterns in little-endian order. Fields with zero corrections omit
+the section.
+
+Field decoding first runs the core, then validates the complete correction
+layer and overwrites the selected values. The stored corrected-stream fixture
+checks restoration of negative zero and a specific NaN payload. The original
+M0 fixtures continue to check core-only streams. The format freeze is scheduled
+for M1 and decoded-value fingerprint verification for M3.
 
 ## Mock cores
 

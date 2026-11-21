@@ -86,8 +86,13 @@ Stream read(Bytes bytes) {
                     throw CorruptStream("invalid END section");
                 if (core_count != stream.fields.size()) throw CorruptStream("missing CORE section");
                 return stream;
-            case Section::Residual:
             case Section::Lossless:
+                if (flags != 0) throw UnsupportedFormat("unknown LOSSLESS flags");
+                if (field >= stream.fields.size() || payload.remaining() == 0 || stream.fields[field].lossless.size)
+                    throw CorruptStream("invalid or duplicate LOSSLESS section");
+                stream.fields[field].lossless = {payload.data(), payload.remaining()};
+                break;
+            case Section::Residual:
             case Section::Steps:
             case Section::Transform:
                 throw UnsupportedFormat("unsupported correction or transform layer");
