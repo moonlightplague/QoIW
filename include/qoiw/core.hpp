@@ -26,10 +26,12 @@ enum class BoundKind { StrictAbs, NominalAbs };
 struct CoreTraits {
     // A core must opt in before tuning can rely on a strict absolute bound.
     BoundKind bound_kind = BoundKind::NominalAbs;
+    bool fixed_call_overhead = false;
+    bool thread_safe = true;
 };
 
-// One field per call. Dimensions are in C order. A core instance supports
-// simultaneous calls on disjoint buffers; its identifying strings live with it.
+// One field per call. Dimensions are in C order. A thread-safe core supports
+// simultaneous calls on disjoint buffers. Its identifying strings live with it.
 class Core {
    public:
     virtual ~Core() = default;

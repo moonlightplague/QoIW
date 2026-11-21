@@ -4,6 +4,7 @@
 
 ### M1 candidate measurement
 
+- Measure and cache each candidate's raw decoded blocks, core payload and lossless correction sizes. Price the sample with sensitivity weighting, the rare-outlier estimate, and optional fixed call overhead.
 - Estimate the distribution of tolerable radii within F3 blocks using the full-field range, resolved target tolerances, and exact predicate.
 
 ### M1 point-wise block sampling
