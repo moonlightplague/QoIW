@@ -11,10 +11,7 @@
 
 namespace qoiw::container {
 
-struct Bytes {
-    const std::uint8_t* data = nullptr;
-    std::size_t size = 0;
-};
+using qoiw::Bytes;
 
 struct Field {
     std::string_view name;

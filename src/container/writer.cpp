@@ -22,7 +22,7 @@ void write_section(ByteWriter& writer, Section type, std::uint8_t field, Bytes p
 }
 
 std::vector<std::uint8_t> header_body(const Stream& stream) {
-    if (!valid_shape(stream.dtype, stream.dims)) throw std::invalid_argument("invalid array type or dimensions");
+    if (!common::array_bytes(stream.dtype, stream.dims)) throw std::invalid_argument("invalid array type or dimensions");
     if (stream.fields.empty() || stream.fields.size() > UINT8_MAX) throw std::invalid_argument("invalid field count");
     if (stream.core_name.empty()) throw std::invalid_argument("missing core name");
 
