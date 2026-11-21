@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### M1 point-wise bound shortcuts
+
+- Verify fixed and zero-radius shortcuts through all six mock cores, lossless correction, and a fresh container decode for both storage types. Document the bounds used in each case.
+- Select fixed bounds, a capped fallback for all-zero sampled radii, or a single candidate for strict cores with affine constraints. Preserve the sampled distribution and a positive candidate for requests that need measurement.
+- Expose the core's absolute bound kind for frontend tuning. The identity and quantizer mocks declare a strict bound, and the four adversarial mocks use the nominal default.
+
 ### M1 point-wise prior
 
 - Sample the F0 field at QPET's regular stride, combine all point-wise targets, and extract positive, distinct quantile candidates from the sorted estimates.

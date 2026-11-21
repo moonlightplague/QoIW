@@ -129,6 +129,10 @@ PointPrior estimate_point_prior(DType dtype, const void* original, std::size_t a
         if (radius > 0) result.candidates.push_back(radius);
     }
     auto& candidates = result.candidates;
+    // Custom quantiles can all land on exact samples. Keep a positive seed
+    // for measurement if any exists in the sampled distribution.
+    if (candidates.empty() && result.sorted_radii.back() > 0)
+        candidates.push_back(*std::upper_bound(result.sorted_radii.begin(), result.sorted_radii.end(), 0.));
     std::sort(candidates.begin(), candidates.end());
     candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
     return result;

@@ -5,9 +5,9 @@ when compressing fixed-grid scientific arrays. The libraries include a
 single-variable expression engine, a sectioned container, and a lossless
 correction layer that restores selected values after core decompression.
 The encoder resolves point-wise tolerances from the original field and checks
-them against the core reconstruction. The frontend also generates candidate
-compressor bounds. Sample-based tuning, the SZ3 adapter, and the CLI are in
-development for M1.
+them against the core reconstruction. The frontend generates candidate
+compressor bounds and can select one when a shortcut applies.
+Sample-based tuning, the SZ3 adapter, and the CLI are in development for M1.
 [Development plan](PLAN.md)
 
 ## Build and test
@@ -143,9 +143,24 @@ undefined or exceeds the tolerance. The smallest estimate
 across targets is capped by the data range and any active data bound.
 
 Exact samples contribute zeros to the sorted distribution. Positive distinct
-quantiles supply the initial compressor bounds for tuning. The backend checks
-the actual decoded field for every selected bound. The estimator and quantile
-sampling follow the pinned public QPET implementation. [QPET license](LICENSES/QPET.txt)
+quantiles supply the initial compressor bounds for tuning. If all requested
+quantiles select zero, the first positive sampled radius supplies a candidate
+when available. The backend checks the actual decoded field for every selected
+bound. The estimator and default quantiles follow the pinned public QPET
+implementation. [QPET license](LICENSES/QPET.txt)
+
+### Selecting a bound without trial compression
+
+Frontend step F2 can supply a compressor bound in three cases.
+
+| Condition | Bound sent to the core |
+| --- | --- |
+| The caller fixes a finite, nonnegative bound. | Use that value, including zero, and skip the prior. Fixed-bound experiments can exceed the resolved data bound. The backend still enforces that data bound on the decoded field. |
+| Every sampled radius is zero. | Use one billionth of the finite input range, or 1 for a constant or absent range. A positive range gives at least the smallest positive `double`. Any active data bound caps the result. |
+| A strict absolute-error core has a single candidate and all constraints are affine. | Use the candidate. A data bound on its own qualifies. An exact-value predicate requires measurement. |
+
+Other requests retain the prior and its candidates for measured tuning.
+Every path returns the resolved request for full-field verification.
 
 ## Reference benchmarks
 

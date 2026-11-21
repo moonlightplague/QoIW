@@ -9,6 +9,12 @@
 #include "common/shape.hpp"
 
 namespace qoiw::frontend {
+
+double Range::scaled_width(double scale) const {
+    const double span = max - min;
+    return std::isfinite(span) ? scale * span : scale * max - scale * min;
+}
+
 namespace {
 constexpr std::size_t kBatch = 4096;
 constexpr std::size_t kWordBits = 64;
@@ -37,11 +43,7 @@ void check_tolerance(Tolerance tol) {
 double absolute(Tolerance tol, const std::optional<Range>& range) {
     if (tol.mode == Tolerance::Mode::Absolute || tol.value == 0 || !range || range->min == range->max)
         return tol.value;
-    const double span = range->max - range->min;
-    // Opposite finite extremes can overflow the subtraction even when a
-    // fractional tolerance times their distance fits in double.
-    const double bound = std::isfinite(span) ? tol.value * span
-                                             : tol.value * range->max - tol.value * range->min;
+    const double bound = range->scaled_width(tol.value);
     if (!std::isfinite(bound)) throw std::overflow_error("resolved tolerance exceeds double range");
     return bound;
 }

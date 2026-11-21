@@ -6,7 +6,7 @@
 
 #include "backend/pointwise.hpp"
 #include "core/adapters/mock.hpp"
-#include "frontend/prior.hpp"
+#include "frontend/prepare.hpp"
 #include "pipeline/decode_field.hpp"
 
 namespace {
@@ -29,8 +29,10 @@ bool may_keep(const T& original, const T& candidate) {
            std::abs(x * x - y * y) <= 1.;
 }
 
+enum class BoundCase { Candidates, Fixed, ZeroSample };
+
 template <class T>
-void round_trip() {
+void round_trip(BoundCase selection) {
     const auto dtype = std::is_same_v<T, float> ? DType::Float32 : DType::Float64;
     const std::vector<std::uint64_t> dims{65, 65};
     std::vector<T> original(65 * 65);
@@ -41,21 +43,31 @@ void round_trip() {
     original[2049] = static_cast<T>(1e36);
     original.back() = std::numeric_limits<T>::denorm_min();
     const auto bytes = original.size() * sizeof(T);
-    using Mode = qoiw::frontend::Tolerance::Mode;
+    using namespace qoiw::frontend;
+    using Mode = Tolerance::Mode;
     // The finite, unmasked field spans 3, and x^2 spans 361/64.
-    const qoiw::frontend::PointRequest spec{{{Expr("ln(x)"), {Mode::Absolute, .5}},
-                                              {Expr("x^2"), {Mode::Relative, 64. / 361}}},
-                                             qoiw::frontend::Tolerance{Mode::Relative, 1. / 12}, Expr("x > 1e30")};
-    const auto resolved = qoiw::frontend::resolve_pointwise(dtype, original.data(), bytes, spec, 2);
-    const auto& request = resolved.request;
-    const auto prior = qoiw::frontend::estimate_point_prior(dtype, original.data(), bytes, resolved, 2);
-    if (prior.candidates.empty()) throw std::runtime_error("expected positive candidate bounds");
+    const PointRequest spec{{{Expr("ln(x)"), {Mode::Absolute, .5}}, {Expr("x^2"), {Mode::Relative, 64. / 361}}},
+                            Tolerance{Mode::Relative, 1. / 12}, Expr("x > 1e30")};
+    const auto fixed_bound = selection == BoundCase::Fixed ? std::optional<double>{1.} : std::nullopt;
+    // With one sample, F1 sees only the negative value at index zero.
+    const PriorOptions options{selection == BoundCase::ZeroSample ? 1u : 0u, {}};
 
     for (auto name : {"mock:identity", "mock:quantizer", "mock:noise", "mock:garbage", "mock:signflip", "mock:nan"}) {
         const auto& core = qoiw::test::mock_core(name);
+        const auto prep = prepare_pointwise(dtype, original.data(), bytes, spec, core.traits(dtype, dims.size()),
+                                            2, fixed_bound, options);
+        const auto& request = prep.resolved.request;
         qoiw::CoreParams params;
-        params.bound = prior.candidates.back();
-        // Overruns the data bound while staying finite on ordinary inputs.
+        if (selection == BoundCase::Candidates) {
+            const auto& candidates = std::get<PointPrior>(prep.decision).candidates;
+            if (candidates.empty()) throw std::runtime_error("expected positive candidate bounds");
+            params.bound = candidates.back();
+        } else {
+            params.bound = std::get<PointShortcut>(prep.decision).bound;
+            if (params.bound != fixed_bound.value_or(3 * 1e-9))
+                throw std::runtime_error("unexpected compressor bound for shortcut");
+        }
+        // Deliberately overshoot the core's bound on ordinary inputs.
         if (core.name() == "mock:noise") params.options["factor"] = "3";
         const auto payload = core.compress(original.data(), dtype, dims, params);
         std::vector<T> raw(original.size());
@@ -91,7 +103,8 @@ void round_trip() {
             if (threads == 1) serial_stream = blob;
             if (blob != serial_stream) throw std::runtime_error(std::string(name) + " stream differs by thread count");
             const auto parsed = qoiw::container::read(view(blob));
-            if (parsed.fields[0].data_bound_abs != .25 || parsed.targets.size() != 2 ||
+            if (parsed.fields[0].bound != params.bound || parsed.fields[0].data_bound_abs != .25 ||
+                parsed.targets.size() != 2 ||
                 parsed.targets[0].expression != "ln(x)" || parsed.targets[0].tolerance_abs != .5 ||
                 parsed.targets[1].expression != "x^2" || parsed.targets[1].tolerance_abs != 1.)
                 throw std::runtime_error("stored tolerances differ from scalar reference");
@@ -107,8 +120,10 @@ void round_trip() {
 
 int main() {
     try {
-        round_trip<float>();
-        round_trip<double>();
+        for (const auto selection : {BoundCase::Candidates, BoundCase::Fixed, BoundCase::ZeroSample}) {
+            round_trip<float>(selection);
+            round_trip<double>(selection);
+        }
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

@@ -21,6 +21,13 @@ struct CoreOutput {
     std::vector<std::uint8_t> decode_params;
 };
 
+enum class BoundKind { StrictAbs, NominalAbs };
+
+struct CoreTraits {
+    // A core must opt in before tuning can rely on a strict absolute bound.
+    BoundKind bound_kind = BoundKind::NominalAbs;
+};
+
 // One field per call. Dimensions are in C order. A core instance supports
 // simultaneous calls on disjoint buffers; its identifying strings live with it.
 class Core {
@@ -30,6 +37,7 @@ class Core {
     virtual std::string_view version() const = 0;
     virtual std::string_view format_version() const = 0;
     virtual bool supports(DType dtype, const std::vector<std::uint64_t>& dims) const = 0;
+    virtual CoreTraits traits(DType, std::size_t /*ndims*/) const { return {}; }
 
     // Input points to an array of the given storage type and shape.
     virtual CoreOutput compress(const void* data, DType dtype, const std::vector<std::uint64_t>& dims,

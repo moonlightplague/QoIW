@@ -68,3 +68,8 @@ add_executable(qoiw_test_prior unit/frontend/prior.cpp)
 qoiw_configure_target(qoiw_test_prior)
 target_link_libraries(qoiw_test_prior PRIVATE QOIW::qoiw)
 add_test(NAME frontend.prior COMMAND qoiw_test_prior)
+
+add_executable(qoiw_test_prepare unit/frontend/prepare.cpp)
+qoiw_configure_target(qoiw_test_prepare)
+target_link_libraries(qoiw_test_prepare PRIVATE QOIW::qoiw)
+add_test(NAME frontend.prepare COMMAND qoiw_test_prepare)
