@@ -5,8 +5,9 @@ when compressing fixed-grid scientific arrays. The libraries include a
 single-variable expression engine, a sectioned container, and a lossless
 correction layer that restores selected values after core decompression.
 The encoder resolves point-wise tolerances from the original field and checks
-them against the core reconstruction. Bound prediction, the SZ3 adapter, and
-the CLI are in development for M1.
+them against the core reconstruction. The frontend also generates candidate
+compressor bounds. Sample-based tuning, the SZ3 adapter, and the CLI are in
+development for M1.
 [Development plan](PLAN.md)
 
 ## Build and test
@@ -130,6 +131,21 @@ An exact condition such as `x > 1e30` excludes fill values from every range.
 NaN and infinite inputs are also excluded. At a finite, unmasked input where
 one expression is undefined, the other targets still contribute their finite
 values to their own ranges. F0 marks that input for exact preservation.
+
+### Estimating candidate bounds
+
+Frontend step F1 samples the field at a regular stride, targeting about
+1,048,576 values by default. At each sampled value it uses each expression's
+first and second derivatives to estimate an allowable error in the input.
+It probes just across a breakpoint to see whether the jump fits the tolerance.
+It checks both endpoints and shrinks the estimate when either endpoint is
+undefined or exceeds the tolerance. The smallest estimate
+across targets is capped by the data range and any active data bound.
+
+Exact samples contribute zeros to the sorted distribution. Positive distinct
+quantiles supply the initial compressor bounds for tuning. The backend checks
+the actual decoded field for every selected bound. The estimator and quantile
+sampling follow the pinned public QPET implementation. [QPET license](LICENSES/QPET.txt)
 
 ## Reference benchmarks
 

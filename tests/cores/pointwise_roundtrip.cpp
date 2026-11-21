@@ -6,7 +6,7 @@
 
 #include "backend/pointwise.hpp"
 #include "core/adapters/mock.hpp"
-#include "frontend/resolve.hpp"
+#include "frontend/prior.hpp"
 #include "pipeline/decode_field.hpp"
 
 namespace {
@@ -48,11 +48,13 @@ void round_trip() {
                                              qoiw::frontend::Tolerance{Mode::Relative, 1. / 12}, Expr("x > 1e30")};
     const auto resolved = qoiw::frontend::resolve_pointwise(dtype, original.data(), bytes, spec, 2);
     const auto& request = resolved.request;
+    const auto prior = qoiw::frontend::estimate_point_prior(dtype, original.data(), bytes, resolved, 2);
+    if (prior.candidates.empty()) throw std::runtime_error("expected positive candidate bounds");
 
     for (auto name : {"mock:identity", "mock:quantizer", "mock:noise", "mock:garbage", "mock:signflip", "mock:nan"}) {
         const auto& core = qoiw::test::mock_core(name);
         qoiw::CoreParams params;
-        params.bound = 0.125;
+        params.bound = prior.candidates.back();
         // Overruns the data bound while staying finite on ordinary inputs.
         if (core.name() == "mock:noise") params.options["factor"] = "3";
         const auto payload = core.compress(original.data(), dtype, dims, params);
