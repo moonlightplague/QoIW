@@ -12,6 +12,7 @@ class ByteReader {
    public:
     ByteReader(const std::uint8_t* data, std::size_t size);
     std::size_t remaining() const { return remaining_; }
+    const std::uint8_t* data() const { return data_; }
     ByteReader take(std::uint64_t size);
     std::uint8_t u8();
     std::uint16_t u16();
@@ -37,6 +38,8 @@ class CorruptStream : public std::runtime_error {
 class ByteWriter {
    public:
     explicit ByteWriter(std::vector<std::uint8_t>& output) : output_(output) {}
+    // Source range must be disjoint from the output vector.
+    void bytes(const std::uint8_t* data, std::size_t size);
     void u8(std::uint8_t value);
     void u16(std::uint16_t value);
     void u32(std::uint32_t value);

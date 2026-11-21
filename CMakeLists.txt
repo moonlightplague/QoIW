@@ -6,10 +6,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 include(cmake/QoiwOptions.cmake)
 include(cmake/QoiwCores.cmake)
 
-add_library(qoiw_decode STATIC src/common/byte_reader.cpp)
+add_library(qoiw_decode STATIC src/common/byte_reader.cpp src/container/reader.cpp)
+target_include_directories(qoiw_decode PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
 qoiw_configure_target(qoiw_decode)
 
-add_library(qoiw STATIC src/common/byte_writer.cpp)
+add_library(qoiw STATIC src/common/byte_writer.cpp src/container/writer.cpp)
 add_library(QOIW::qoiw ALIAS qoiw)
 qoiw_configure_target(qoiw)
 target_link_libraries(qoiw PUBLIC qoiw_decode)
