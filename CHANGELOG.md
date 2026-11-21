@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### M1 lossless corrections
+
+- Encode increasing indices as ULEB128 gaps and original IEEE bits in separate zstd frames. Validate both frames and all indices before restoring the decoded field.
+
 ### M0 reference baseline
 
 - Check benchmark field sizes and readability, and prepare and bit-check the three Miranda float32 inputs for the M1 regret cases.

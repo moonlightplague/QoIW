@@ -41,3 +41,8 @@ add_executable(qoiw_test_expr_edges unit/expr/edge_cases.cpp)
 qoiw_configure_target(qoiw_test_expr_edges)
 target_link_libraries(qoiw_test_expr_edges PRIVATE QOIW::qoiw Threads::Threads)
 add_test(NAME expr.edges COMMAND qoiw_test_expr_edges)
+
+add_executable(qoiw_test_lossless unit/backend/lossless.cpp)
+qoiw_configure_target(qoiw_test_lossless)
+target_link_libraries(qoiw_test_lossless PRIVATE QOIW::qoiw)
+add_test(NAME backend.lossless COMMAND qoiw_test_lossless)
