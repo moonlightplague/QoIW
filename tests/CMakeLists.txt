@@ -29,7 +29,8 @@ add_executable(qoiw_test_mock_roundtrip cores/mock_roundtrip.cpp)
 qoiw_configure_target(qoiw_test_mock_roundtrip)
 target_link_libraries(qoiw_test_mock_roundtrip PRIVATE qoiw_mock_cores QOIW::qoiw Threads::Threads)
 target_compile_definitions(qoiw_test_mock_roundtrip PRIVATE
-    QOIW_MOCK_GOLDEN="${CMAKE_CURRENT_SOURCE_DIR}/golden/m0-mock-quantizer.qoiw")
+    QOIW_MOCK_GOLDEN="${CMAKE_CURRENT_SOURCE_DIR}/golden/m0-mock-quantizer.qoiw"
+    QOIW_LOSSLESS_GOLDEN="${CMAKE_CURRENT_SOURCE_DIR}/golden/m1-lossless.qoiw")
 add_test(NAME core.mock_roundtrip COMMAND qoiw_test_mock_roundtrip)
 
 add_executable(qoiw_test_expr_reference unit/expr/reference.cpp)

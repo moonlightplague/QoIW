@@ -4,6 +4,7 @@
 
 ### M1 lossless corrections
 
+- Store optional per-field LOSSLESS sections and restore their values after core decompression in the decode library. Preserve the existing core-only wire fixtures.
 - Encode increasing indices as ULEB128 gaps and original IEEE bits in separate zstd frames. Validate both frames and all indices before restoring the decoded field.
 
 ### M0 reference baseline

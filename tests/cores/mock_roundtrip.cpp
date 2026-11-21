@@ -7,9 +7,11 @@
 #include <limits>
 #include <type_traits>
 
+#include "backend/lossless.hpp"
 #include "common/byte_io.hpp"
 #include "container/container.hpp"
 #include "core/adapters/mock.hpp"
+#include "pipeline/decode_field.hpp"
 
 namespace {
 using qoiw::Bytes;
@@ -39,7 +41,8 @@ template <class T>
 constexpr DType dtype = std::is_same_v<T, float> ? DType::Float32 : DType::Float64;
 
 template <class T, std::size_t N>
-Buffer pack(std::string_view name, const std::array<T, N>& values, const Shape& dims, const CoreParams& params) {
+Buffer pack(std::string_view name, const std::array<T, N>& values, const Shape& dims, const CoreParams& params,
+            const std::vector<std::size_t>& exact = {}) {
     const auto& core = mock_core(name);
     check(core.supports(dtype<T>, dims), "unsupported test shape");
     auto payload = core.compress(values.data(), dtype<T>, dims, params);
@@ -50,7 +53,9 @@ Buffer pack(std::string_view name, const std::array<T, N>& values, const Shape& 
     stream.core_name = core.name();
     stream.core_version = core.version();
     stream.core_format_version = core.format_version();
-    stream.fields = {{"x", params.bound, std::nullopt, view(payload.decode_params), 0, view(payload.stream)}};
+    auto lossless = qoiw::backend::encode_lossless(dtype<T>, values.data(), sizeof(values), exact);
+    stream.fields = {{"x", params.bound, std::nullopt, view(payload.decode_params), 0, view(payload.stream),
+                      view(lossless)}};
     return write(stream);
 }
 
@@ -60,10 +65,8 @@ std::array<T, N> unpack(const Buffer& bytes, int threads) {
     const auto& core = mock_core(stream.core_name);
     check(stream.dtype == dtype<T> && stream.fields.size() == 1, "unexpected output type or field count");
     check(core.format_version() == stream.core_format_version, "unexpected core format");
-    const auto& field = stream.fields.front();
     std::array<T, N> output{};
-    core.decompress(field.core_stream, field.decode_params, stream.dtype, stream.dims, threads,
-                    output.data(), sizeof(output));
+    qoiw::pipeline::decode_field(stream, 0, core, threads, output.data(), sizeof(output));
     return output;
 }
 
@@ -101,6 +104,27 @@ void round_trips() {
             }
         }
     }
+}
+
+void corrected_garbage_core() {
+    const std::array<float, 5> input{2, -0.0f, 3, 4, 5};
+    const std::array<float, 5> expected{1, -0.0f, 1, 4, 5};
+    const auto bytes = pack("mock:garbage", input, {1, 5}, CoreParams{}, {1, 3, 4});
+    for (int threads : {1, 2, 7, 16}) {
+        check(same_bits(unpack<float, 5>(bytes, threads), expected), "lossless layer after garbage decode");
+    }
+
+    auto stream = qoiw::container::read(view(bytes));
+    const auto& core = mock_core(stream.core_name);
+    std::array<float, 6> padded{};
+    padded.back() = 123;
+    auto decode = [&] { return qoiw::pipeline::decode_field(stream, 0, core, 1, padded.data(), sizeof(padded)); };
+    check(decode() == 3 && padded.back() == 123, "incorrect correction count or write past field");
+    const auto oversized = qoiw::backend::encode_lossless(DType::Float32, padded.data(), sizeof(padded), {5});
+    stream.fields[0].lossless = view(oversized);
+    padded.back() = 77;
+    expect_error<qoiw::common::CorruptStream>(decode, "correction beyond declared shape accepted");
+    check(padded.back() == 77, "out-of-field correction changed padding");
 }
 
 void exceptional_values() {
@@ -165,16 +189,24 @@ void invalid_inputs() {
     }
 }
 
+Buffer load_fixture(const char* path) {
+    std::ifstream file(path, std::ios::binary);
+    check(file.good(), "cannot open golden stream");
+    return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+}
+
 void golden() {
-    std::ifstream file(QOIW_MOCK_GOLDEN, std::ios::binary);
-    check(file.good(), "cannot open mock quantizer golden stream");
-    const Buffer bytes{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+    const auto bytes = load_fixture(QOIW_MOCK_GOLDEN);
     const std::array<float, 4> original{-1.25, -0.25, 0, 0.75};
     const std::array<float, 4> expected{-1.5, -0.5, 0, 1};
     check(same_bits(unpack<float, 4>(bytes, 1), expected), "golden decode");
     CoreParams params;
     params.bound = .25;
     check(pack("mock:quantizer", original, {1, 4}, params) == bytes, "golden encoding");
+
+    const auto corrected = unpack<float, 4>(load_fixture(QOIW_LOSSLESS_GOLDEN), 1);
+    const std::array<std::uint32_t, 4> bits{0xbfc00000, 0x80000000, 0x7fc00055, 0x3f800000};
+    check(std::memcmp(corrected.data(), bits.data(), sizeof(bits)) == 0, "corrected golden decode");
 }
 }  // namespace
 
@@ -185,6 +217,7 @@ int main() {
         round_trips<double>();
         floats.get();
         golden();
+        corrected_garbage_core();
         exceptional_values();
         invalid_inputs();
     } catch (const std::exception& error) {
