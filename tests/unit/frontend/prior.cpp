@@ -6,6 +6,7 @@
 #include <type_traits>
 
 #include "frontend/prior.hpp"
+#include "frontend/sample.hpp"
 
 namespace {
 using qoiw::Expr;
@@ -112,6 +113,24 @@ void default_quantile_ranks() {
     check(prior.candidates == expected, "default candidate quantiles");
 }
 
+template <class T>
+void block_distribution() {
+    using namespace qoiw::frontend;
+    using Mode = Tolerance::Mode;
+    const T field[]{-1, 2, 2, 2, 4, 99, std::numeric_limits<T>::infinity(), 9};
+    const auto dtype = sizeof(T) == 4 ? qoiw::DType::Float32 : qoiw::DType::Float64;
+    const PointRequest spec{{{Expr("sqrt(x)"), {Mode::Absolute, 4}}, {Expr("2*x"), {Mode::Relative, .0125}}},
+                            {}, Expr("x == 99")};
+    const auto resolved = resolve_pointwise(dtype, field, sizeof(field), spec, 1);
+    // The constant first block uses the full input's resolved tolerance (0.25 for 2*x).
+    const BlockSample sample{{{3}, {1, 4}, false}, std::vector<std::vector<T>>{{2, 2, 2}, {4, 99, field[6]}}};
+    const std::vector<double> expected{0, 0, .125, .125, .125, .125};
+    for (int threads : {1, 4}) check(estimate_block_radii(sample, resolved, threads) == expected, "block prior");
+    const auto whole = sample_blocks(dtype, field, sizeof(field), {8}, 1);
+    check(estimate_block_radii(whole, resolved, 2) ==
+              estimate_point_prior(dtype, field, sizeof(field), resolved, 1).sorted_radii, "F1 and block radii differ");
+}
+
 void invalid_inputs() {
     using namespace qoiw::frontend;
     const auto dtype = qoiw::DType::Float64;
@@ -144,6 +163,8 @@ int main() {
         sampled_targets<double>();
         degenerate_fields();
         default_quantile_ranks();
+        block_distribution<float>();
+        block_distribution<double>();
         invalid_inputs();
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';

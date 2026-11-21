@@ -27,6 +27,7 @@ add_library(qoiw STATIC
     src/frontend/resolve.cpp
     src/frontend/prior.cpp
     src/frontend/prepare.cpp
+    src/frontend/measure.cpp
     src/frontend/sample.cpp)
 add_library(QOIW::qoiw ALIAS qoiw)
 qoiw_configure_target(qoiw)

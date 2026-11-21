@@ -8,11 +8,27 @@
 
 #include "common/parallel_for.hpp"
 #include "common/shape.hpp"
+#include "frontend/sample.hpp"
 
 namespace qoiw::frontend {
 namespace {
 constexpr double infinity = std::numeric_limits<double>::infinity();
 constexpr std::size_t default_samples = 1u << 20;
+
+double field_cap(const PointResolution& resolved) {
+    const auto& range = resolved.data_range;
+    const double span = range ? range->max - range->min : 0.;
+    return std::min(span, resolved.request.data_bound_abs.value_or(std::numeric_limits<double>::max()));
+}
+
+double target_radius(const ResolvedPointRequest& request, double x, double cap) {
+    double radius = cap;
+    for (const auto& target : request.targets) {
+        radius = std::min(radius, pointwise_radius(target, x, cap));
+        if (radius == 0) break;
+    }
+    return radius;
+}
 
 // Positive root of slope*e + curvature*e^2/2 = tolerance.
 double taylor_radius(double slope, double curvature, double tolerance) {
@@ -99,9 +115,7 @@ PointPrior estimate_point_prior(DType dtype, const void* original, std::size_t a
 
     // Only a finite bound can be passed to a core, even if subtracting the
     // extreme finite values of a field overflows.
-    const auto& range = resolved.data_range;
-    const double span = range ? range->max - range->min : 0.;
-    const double cap = std::min(span, resolved.request.data_bound_abs.value_or(std::numeric_limits<double>::max()));
+    const double cap = field_cap(resolved);
     const auto samples = options.point_samples ? options.point_samples : default_samples;
     PointPrior result;
     result.stride = std::max<std::size_t>(1, count / samples);
@@ -112,12 +126,7 @@ PointPrior estimate_point_prior(DType dtype, const void* original, std::size_t a
             if ((resolved.exact_mask[index / 64] >> (index % 64)) & 1u) return;
             const double x = dtype == DType::Float32 ? static_cast<const float*>(original)[index]
                                                      : static_cast<const double*>(original)[index];
-            double radius = cap;
-            for (const auto& target : resolved.request.targets) {
-                radius = std::min(radius, pointwise_radius(target, x, cap));
-                if (radius == 0) break;
-            }
-            result.sorted_radii[i] = radius;
+            result.sorted_radii[i] = target_radius(resolved.request, x, cap);
         });
         std::sort(result.sorted_radii.begin(), result.sorted_radii.end());
     }
@@ -136,6 +145,27 @@ PointPrior estimate_point_prior(DType dtype, const void* original, std::size_t a
     std::sort(candidates.begin(), candidates.end());
     candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
     return result;
+}
+
+std::vector<double> estimate_block_radii(const BlockSample& sample, const PointResolution& resolved, int threads) {
+    if (threads < 0) throw std::invalid_argument("invalid thread count for block prior");
+    const auto values = sample.values_per_block();
+    const auto count = sample.layout.origins.size();
+    const auto stride = std::max<std::size_t>(1, count * values / default_samples);
+    const auto per_block = 1 + (values - 1) / stride;
+    std::vector<double> radii(count * per_block);
+    const auto cap = field_cap(resolved);
+    if (cap > 0) {
+        std::visit([&](const auto& blocks) {
+            common::parallel_for(radii.size(), threads, [&](std::size_t i) {
+                const double x = blocks[i / per_block][(i % per_block) * stride];
+                if (!std::isfinite(x) || (resolved.request.exact && resolved.request.exact->eval(x) != 0)) return;
+                radii[i] = target_radius(resolved.request, x, cap);
+            });
+        }, sample.blocks);
+        std::sort(radii.begin(), radii.end());
+    }
+    return radii;
 }
 
 }  // namespace qoiw::frontend

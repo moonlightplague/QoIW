@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### M1 candidate measurement
+
+- Compare F4's raw decodes, correction counts, and payload sizes with independent scalar checks across all six mock cores and both storage types. Document the cost calculation.
+- Measure and cache each candidate's raw decoded blocks, core payload and lossless correction sizes. Price the sample with sensitivity weighting, the rare-outlier estimate, and optional fixed call overhead.
+- Estimate the distribution of tolerable radii within F3 blocks using the full-field range, resolved target tolerances, and exact predicate.
+
 ### M1 point-wise block sampling
 
 - Prepare blocks alongside the full-field prior for requests that need measurement. Validate the input shape before resolution and skip sampling for all three bound shortcuts.

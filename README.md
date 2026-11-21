@@ -6,9 +6,9 @@ single-variable expression engine, a sectioned container, and a lossless
 correction layer that restores selected values after core decompression.
 The encoder resolves point-wise tolerances from the original field and checks
 them against the core reconstruction. The frontend generates candidate
-compressor bounds and can select one when a shortcut applies. Other requests
-get a sample of the field for tuning. Candidate measurement and search, the
-SZ3 adapter, and the CLI are in development for M1.
+compressor bounds and can select one when a shortcut applies. For other
+requests it measures each candidate on a sample of the field. Bound search, the SZ3
+adapter, and the CLI are in development for M1.
 [Development plan](PLAN.md)
 
 ## Build and test
@@ -183,6 +183,28 @@ F3 copies the whole field as a single block and records that choice. The
 sample owns the original float32 or float64 bits. On the Hurricane reference
 field of shape `100 × 500 × 500`, the defaults select five `50 × 63 × 63` blocks,
 matching QPET's locations and all 992,250 sampled values. [QPET license](LICENSES/QPET.txt)
+
+### Measuring candidate costs
+
+For each candidate bound, F4 compresses and decompresses every sample block
+with one core thread per call. It runs the point-wise backend on a copy of the
+reconstruction and counts the encoded lossless bytes. The core byte count
+includes the stream and any decode parameters. Repeating a bound reuses the
+measurement and raw decoded blocks from that search.
+
+The estimated cost in bytes per value combines the core bytes and the
+correction bytes. F4 weights the corrections by the fraction of sensitive
+points in the full-field prior divided by their fraction in the blocks. A
+point is sensitive when its estimated radius is strictly below the candidate
+bound. If both fractions are zero, the measured corrections retain unit
+weight. Whole-field samples also retain unit weight.
+
+If the input fraction exceeds 20 times the block fraction, F4 estimates the
+correction cost as `rare_outlier_share × input fraction × (bytes per value + 1)`.
+The default share is 0.1. For cores that declare a fixed cost per call, F4
+compresses a constant block at the same shape and bound to estimate overhead
+on multi-block samples. Each deduction is capped at the measured bytes of that
+block. The measurement retains the raw byte counts alongside its estimate.
 
 ## Reference benchmarks
 

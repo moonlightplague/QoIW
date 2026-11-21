@@ -104,6 +104,24 @@ BlockLayout plan_blocks(DType dtype, const std::vector<std::uint64_t>& dims, con
     return layout;
 }
 
+DType BlockSample::dtype() const {
+    return std::holds_alternative<std::vector<std::vector<float>>>(blocks) ? DType::Float32 : DType::Float64;
+}
+
+std::size_t BlockSample::values_per_block() const {
+    const auto type = dtype();
+    const auto values = common::array_bytes(type, layout.dims) / common::element_bytes(type);
+    std::visit([&](const auto& data) {
+        if (!values || data.empty() || data.size() != layout.origins.size() ||
+            (layout.whole_input_sampled && data.size() != 1))
+            throw std::invalid_argument("invalid block sample layout");
+        for (const auto& block : data) {
+            if (block.size() != values) throw std::invalid_argument("sample block size disagrees with shape");
+        }
+    }, blocks);
+    return values;
+}
+
 BlockSample sample_blocks(DType dtype, const void* original, std::size_t array_bytes,
                           const std::vector<std::uint64_t>& dims, int threads, const BlockSamplingOptions& options) {
     if (!original || !array_bytes || array_bytes != common::array_bytes(dtype, dims) || threads < 0)
