@@ -4,6 +4,7 @@
 
 ### M0 reference baseline
 
+- Check benchmark field sizes and readability, and prepare and bit-check the three Miranda float32 inputs for the M1 regret cases.
 - Add a pinned QPET/SZ3 build recipe and a Hurricane anchor that checks the saved stream with an independent NumPy decoder-output comparison.
 
 ### Earlier M0 commits
