@@ -1,9 +1,10 @@
 # QoIW
 
 QoIW is a C++17 wrapper under development for preserving quantities of interest
-when compressing fixed-grid scientific arrays. The first M0 components are the
-build, SZ3 dependency integration, binary I/O, and an internal container reader
-and writer for streams with zero QoI targets. The compression pipeline and CLI are planned for M1. [Development plan](PLAN.md)
+when compressing fixed-grid scientific arrays. M0 includes the build, SZ3 dependency integration,
+binary I/O, a container for streams with zero QoI targets, test-only mock cores,
+and a single-variable expression engine. The compression pipeline and CLI are
+planned for M1. [Development plan](PLAN.md)
 
 ## Build and test
 
@@ -63,3 +64,23 @@ The adapters build with `QOIW_BUILD_TESTS=ON`.
 The quantizer golden stream contains a 1 × 4 float32 array compressed at bound
 0.25. Its stored step of 0.5 and signed indices −3, −1, 0, 2 reconstruct
 −1.5, −0.5, 0, 1. The test checks both the wire bytes and these decoded values.
+
+## Point-wise expressions
+
+Link against `QOIW::qoiw` and include `<qoiw/expr.hpp>` to compile a formula
+once and evaluate it on doubles. For example, `qoiw::Expr f("x < 0 ? 0 : x^2")`
+gives `f.eval(3) == 9`. At the same input, `f.jet(3)` gives first derivative 6
+and second derivative 2. Use `f.eval(input, output, count)` for batches. Input
+and output can be the same array.
+
+The grammar supports comparisons, conditional branches, implicit multiplication
+such as `10x`, and the constants `pi`, `e`, `nan`, and `inf`. Powers associate
+to the right. `round` rounds halfway cases away from zero. The jet fields
+`dist` and `brk` give local estimates of the distance in `x` to a singularity
+and a breakpoint, respectively. A positive infinity indicates that the
+analysis found no such boundary. The compiler supports 64 levels of syntax
+nesting, 512 levels in the folded syntax tree, and 64 evaluation stack slots.
+
+The parser, bytecode evaluation, differentiation, and reference tests are
+adapted from public QPET commit `a80e6861fc15e7a66eb1f36b6172911a541b9d3c`.
+[QPET BSD 3-Clause license](LICENSES/QPET.txt)

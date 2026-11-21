@@ -23,6 +23,7 @@ static int failures = 0;
 
 static bool close(double a, double b, double rel = 1e-9) {
     if (std::isnan(a) || std::isnan(b)) return std::isnan(a) && std::isnan(b);
+    if (!std::isfinite(a) || !std::isfinite(b)) return a == b;
     return std::fabs(a - b) <= rel * std::max({1.0, std::fabs(a), std::fabs(b)});
 }
 
@@ -63,6 +64,10 @@ int main() {
         {"abs(x - 1)", [](double x) { return std::fabs(x - 1); }, 2, 5},
         {"pow(x, 2.5)", [](double x) { return std::pow(x, 2.5); }, 0.1, 5},
         {"x^x", [](double x) { return std::pow(x, x); }, 0.5, 3},
+        {"asin(x)", [](double x) { return std::asin(x); }, -.9, .9},
+        {"acos(x)", [](double x) { return std::acos(x); }, -.9, .9},
+        {"sinh(x)", [](double x) { return std::sinh(x); }, -3, 3},
+        {"cosh(x)", [](double x) { return std::cosh(x); }, -3, 3},
         {"atan(2x)", [](double x) { return std::atan(2 * x); }, -3, 3},
         {"3 - x/2 + pi", [](double x) { return 3 - x / 2 + M_PI; }, -5, 5},
         {"2(x+1)*x", [](double x) { return 2 * (x + 1) * x; }, -5, 5},

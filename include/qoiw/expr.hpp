@@ -42,12 +42,12 @@ class Expr {
 
     double eval(double x) const;
 
-    /** out[i] = f(x[i]). x and out may be the same array. */
+    /** out[i] = f(x[i]). Buffers may be identical or disjoint. For n == 0 both may be null. */
     void eval(const double *x, double *out, std::size_t n) const;
 
     Jet jet(double x) const;
 
-    /** true if f(x) = a*x + b for constants a and b */
+    /** Whether the compiled arithmetic is provably affine (a*x + b with finite coefficients) */
     bool is_linear() const { return linear_; }
 
    private:

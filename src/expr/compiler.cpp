@@ -26,31 +26,33 @@ const Func FUNCS[] = {
 };
 
 struct Node {
+    // degree(), bytecode emission, and destruction traverse this tree recursively.
+    explicit Node(OpCode code, size_t child_height = 0) : op(code), height(child_height + 1) {
+        if (height > 512) throw std::invalid_argument("QoIW: expression tree exceeds 512 levels");
+    }
     OpCode op;
+    size_t height;
     double c = 0;
     std::unique_ptr<Node> a, b, c3;
 };
 using NodePtr = std::unique_ptr<Node>;
 
 NodePtr make_const(double c) {
-    auto n = std::make_unique<Node>();
-    n->op = OP_CONST;
+    auto n = std::make_unique<Node>(OP_CONST);
     n->c = c;
     return n;
 }
 
 NodePtr make_unary(OpCode op, NodePtr a) {
     if (a->op == OP_CONST) return make_const(unary_value(op, a->c));
-    auto n = std::make_unique<Node>();
-    n->op = op;
+    auto n = std::make_unique<Node>(op, a->height);
     n->a = std::move(a);
     return n;
 }
 
 NodePtr make_binary(OpCode op, NodePtr a, NodePtr b) {
     if (a->op == OP_CONST && b->op == OP_CONST) return make_const(binary_value(op, a->c, b->c));
-    auto n = std::make_unique<Node>();
-    n->op = op;
+    auto n = std::make_unique<Node>(op, std::max(a->height, b->height));
     n->a = std::move(a);
     n->b = std::move(b);
     return n;
@@ -58,8 +60,7 @@ NodePtr make_binary(OpCode op, NodePtr a, NodePtr b) {
 
 NodePtr make_select(NodePtr cond, NodePtr a, NodePtr b) {
     if (cond->op == OP_CONST) return cond->c != 0 ? std::move(a) : std::move(b);
-    auto n = std::make_unique<Node>();
-    n->op = OP_SELECT;
+    auto n = std::make_unique<Node>(OP_SELECT, std::max({cond->height, a->height, b->height}));
     n->a = std::move(cond);
     n->b = std::move(a);
     n->c3 = std::move(b);
@@ -80,6 +81,16 @@ class Parser {
    private:
     const std::string &s_;
     size_t pos_ = 0;
+    size_t nesting_ = 0;
+
+    // Only recursive grammar edges consume a nesting level. Iterative operator
+    // chains are limited separately by tree height and the VM stack.
+    NodePtr nested(NodePtr (Parser::*rule)()) {
+        if (++nesting_ > MAX_DEPTH) fail("expression exceeds parser nesting limit");
+        auto node = (this->*rule)();
+        --nesting_;
+        return node;
+    }
 
     [[noreturn]] void fail(const std::string &what) const {
         throw std::invalid_argument("QOIW: cannot parse QoI \"" + s_ + "\": " + what + " at position " +
@@ -125,9 +136,9 @@ class Parser {
     NodePtr expr() {
         NodePtr n = disjunction();
         if (!accept('?')) return n;
-        NodePtr a = expr();
+        NodePtr a = nested(&Parser::expr);
         expect(':');
-        return make_select(std::move(n), std::move(a), expr());
+        return make_select(std::move(n), std::move(a), nested(&Parser::expr));
     }
 
     NodePtr disjunction() {
@@ -143,7 +154,7 @@ class Parser {
     }
 
     NodePtr negation() {
-        if (accept_word("not")) return make_unary(OP_NOT, negation());
+        if (accept_word("not")) return make_unary(OP_NOT, nested(&Parser::negation));
         return comparison();
     }
 
@@ -185,17 +196,17 @@ class Parser {
     }
 
     NodePtr unary() {
-        if (accept('-')) return make_unary(OP_NEG, unary());
-        if (accept('+')) return unary();
+        if (accept('-')) return make_unary(OP_NEG, nested(&Parser::unary));
+        if (accept('+')) return nested(&Parser::unary);
         return power();
     }
 
     NodePtr power() {
         NodePtr base = primary();
-        if (accept('^')) return make_binary(OP_POW, std::move(base), unary());
+        if (accept('^')) return make_binary(OP_POW, std::move(base), nested(&Parser::unary));
         if (peek() == '*' && pos_ + 1 < s_.size() && s_[pos_ + 1] == '*') {
             pos_ += 2;
-            return make_binary(OP_POW, std::move(base), unary());
+            return make_binary(OP_POW, std::move(base), nested(&Parser::unary));
         }
         return base;
     }
@@ -204,13 +215,13 @@ class Parser {
         char c = peek();
         if (c == '(') {
             pos_++;
-            NodePtr n = expr();
+            NodePtr n = nested(&Parser::expr);
             expect(')');
             return n;
         }
         if (c == '|') {
             pos_++;
-            NodePtr n = expr();
+            NodePtr n = nested(&Parser::expr);
             expect('|');
             return make_unary(OP_ABS, std::move(n));
         }
@@ -225,7 +236,7 @@ class Parser {
             char next = peek();
             if ((std::isalpha(static_cast<unsigned char>(next)) || next == '_' || next == '(') && !at_word("and") &&
                 !at_word("or"))
-                return make_binary(OP_MUL, std::move(n), power());
+                return make_binary(OP_MUL, std::move(n), nested(&Parser::power));
             return n;
         }
         if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
@@ -233,11 +244,7 @@ class Parser {
             while (pos_ < s_.size() && (std::isalnum(static_cast<unsigned char>(s_[pos_])) || s_[pos_] == '_'))
                 id += static_cast<char>(std::tolower(static_cast<unsigned char>(s_[pos_++])));
             if (peek() == '(') return call(id);
-            if (id == "x") {
-                auto n = std::make_unique<Node>();
-                n->op = OP_VAR;
-                return n;
-            }
+            if (id == "x") return std::make_unique<Node>(OP_VAR);
             if (id == "nan") return make_const(std::numeric_limits<double>::quiet_NaN());
             if (id == "inf") return make_const(INF);
             if (id == "pi") return make_const(M_PI);
@@ -249,10 +256,10 @@ class Parser {
 
     NodePtr call(const std::string &id) {
         expect('(');
-        NodePtr a = expr();
+        NodePtr a = nested(&Parser::expr);
         NodePtr b, c;
-        if (accept(',')) b = expr();
-        if (b && accept(',')) c = expr();
+        if (accept(',')) b = nested(&Parser::expr);
+        if (b && accept(',')) c = nested(&Parser::expr);
         expect(')');
         if (id == "if") {  // if(condition, value if true, value if false)
             if (!c) fail("if takes three arguments");

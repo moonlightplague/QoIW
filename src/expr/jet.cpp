@@ -49,6 +49,11 @@ inline double cross_dist(const Jet &a, const Jet &b) {
     return zero_dist(d);
 }
 
+inline double truth_break(const Jet &u) {
+    if (u.d1 == 0 && u.d2 == 0) return u.brk;
+    return std::min(u.brk, zero_dist(u));
+}
+
 // a condition or a choice between a and b: the result of the comparison, and where it flips
 inline Jet jet_compare(OpCode op, const Jet &a, const Jet &b) {
     if (op == OP_MIN || op == OP_MAX) {
@@ -61,19 +66,26 @@ inline Jet jet_compare(OpCode op, const Jet &a, const Jet &b) {
     r.v = binary_value(op, a.v, b.v);
     r.dist = std::min(a.dist, b.dist);
     r.brk = std::min(a.brk, b.brk);
-    if (op != OP_AND && op != OP_OR) r.brk = std::min(r.brk, cross_dist(a, b));
+    if (op == OP_AND || op == OP_OR) r.brk = std::min(truth_break(a), truth_break(b));
+    else r.brk = std::min(r.brk, cross_dist(a, b));
     return r;
 }
 
-inline Jet jet_recip(const Jet &u) {
-    double g = 1.0 / u.v;
-    return chain(u, g, -g * g, 2 * g * g * g, zero_dist(u));
+inline Jet jet_div(const Jet &a, const Jet &b) {
+    // Differentiate r*b = a. Forming a reciprocal first can overflow even when r is finite.
+    Jet r;
+    r.v = a.v / b.v;
+    r.d1 = (a.d1 - r.v * b.d1) / b.v;
+    r.d2 = (a.d2 - r.v * b.d2 - 2 * r.d1 * b.d1) / b.v;
+    r.dist = std::min({a.dist, b.dist, zero_dist(b)});
+    r.brk = std::min(a.brk, b.brk);
+    return r;
 }
 
 inline Jet jet_powc(const Jet &u, double p) {
     if (p == 0) return jet_const(1);
     if (p == 1) return u;
-    if (p == 3) return chain(u, u.v * u.v * u.v, 3 * u.v * u.v, 6 * u.v, INF);
+    if (p == 3) return chain(u, std::pow(u.v, p), 3 * u.v * u.v, 6 * u.v, INF);
     if (p == 2) return chain(u, u.v * u.v, 2 * u.v, 2, INF);
     bool smooth = p >= 0 && p == std::floor(p);
     double g = std::pow(u.v, p);
@@ -137,7 +149,12 @@ inline Jet jet_unary(OpCode op, const Jet &u) {
             double g = sigmoid(u.v), s = g * (1 - g);
             return chain(u, g, s, s * (1 - 2 * g), INF);
         }
-        case OP_NOT: return chain(u, u.v == 0, 0, 0, INF);
+        case OP_NOT: {
+            Jet r = jet_const(u.v == 0);
+            r.brk = truth_break(u);
+            r.dist = u.dist;
+            return r;
+        }
         case OP_FLOOR:
         case OP_CEIL:
         case OP_ROUND:
@@ -196,8 +213,10 @@ Jet Expr::jet(double x) const {
                 sp--;
                 break;
             case OP_SELECT: {
-                const double flips = st[sp - 3].brk;
+                const double flips = truth_break(st[sp - 3]);
+                const double dist = st[sp - 3].dist;
                 st[sp - 3] = st[sp - 3].v != 0 ? st[sp - 2] : st[sp - 1];
+                st[sp - 3].dist = std::min(st[sp - 3].dist, dist);
                 st[sp - 3].brk = std::min(st[sp - 3].brk, flips);
                 sp -= 2;
                 break;
@@ -206,13 +225,10 @@ Jet Expr::jet(double x) const {
                 st[sp - 2] = jet_mul(st[sp - 2], st[sp - 1]);
                 sp--;
                 break;
-            case OP_DIV: {
-                const double quotient = st[sp - 2].v / st[sp - 1].v;
-                st[sp - 2] = jet_mul(st[sp - 2], jet_recip(st[sp - 1]));
-                st[sp - 2].v = quotient;
+            case OP_DIV:
+                st[sp - 2] = jet_div(st[sp - 2], st[sp - 1]);
                 sp--;
                 break;
-            }
             case OP_POW: {  // Differentiate exp(w log u) but evaluate the specified pow operation.
                 const double value = std::pow(st[sp - 2].v, st[sp - 1].v);
                 Jet e = jet_mul(st[sp - 1], jet_unary(OP_LOG, st[sp - 2]));
@@ -231,14 +247,9 @@ Jet Expr::jet(double x) const {
                 st[sp - 1].d1 /= op.c;
                 st[sp - 1].d2 /= op.c;
                 break;
-            case OP_RDIVC: {
-                Jet r = jet_recip(st[sp - 1]);
-                r.v = op.c / st[sp - 1].v;
-                r.d1 *= op.c;
-                r.d2 *= op.c;
-                st[sp - 1] = r;
+            case OP_RDIVC:
+                st[sp - 1] = jet_div(jet_const(op.c), st[sp - 1]);
                 break;
-            }
             case OP_POWC: st[sp - 1] = jet_powc(st[sp - 1], op.c); break;
             default: st[sp - 1] = jet_unary(static_cast<OpCode>(op.code), st[sp - 1]); break;
         }

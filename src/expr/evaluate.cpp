@@ -85,8 +85,7 @@ void run(const Ops &prog, const double *x, double *out, size_t n, double *st) {
             case OP_POWC:
                 if (c == 2) {
                     QOIW_LOOP(a[i] * a[i]);
-                } else if (c == 3) {
-                    QOIW_LOOP(a[i] * a[i] * a[i]);
+
                 } else {
                     QOIW_LOOP(std::pow(a[i], c));
                 }
