@@ -23,6 +23,11 @@ struct Field {
     Bytes lossless{};  // Absent when no indices need correction.
 };
 
+struct PointTargetInfo {
+    std::string_view expression;
+    double tolerance_abs = 0;
+};
+
 // Strings and byte ranges borrow their storage. For read(), keep the source
 // buffer alive and unmodified while using the returned view.
 struct Stream {
@@ -34,6 +39,7 @@ struct Stream {
     std::string_view core_format_version;
     std::vector<Field> fields;
     std::string_view exact_condition;
+    std::vector<PointTargetInfo> targets{};
 };
 
 class UnsupportedFormat : public std::runtime_error {

@@ -10,9 +10,9 @@
 namespace fixture {
 using Buffer = std::vector<std::uint8_t>;
 
-inline Buffer load() {
-    std::ifstream input(QOIW_GOLDEN_FILE, std::ios::binary);
-    if (!input) throw std::runtime_error("cannot open M0 golden stream");
+inline Buffer load(const char* path = QOIW_GOLDEN_FILE) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) throw std::runtime_error("cannot open golden stream");
     return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
 }
 

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### M1 point-wise tolerance resolution
+
+- Store each point-wise expression and its resolved absolute tolerance in the checksummed request header. Read these records as metadata and preserve the wire bytes of streams with zero targets.
+- Resolve absolute and relative tolerances in one parallel pass over a field. Report finite data and QoI ranges, count non-finite inputs, and identify original values that require exact preservation.
+
 ### M1 point-wise correction pass
 
 - Check the corrected float32 and float64 fields from all six mock cores against independent scalar expectations and fresh container decodes across thread counts.

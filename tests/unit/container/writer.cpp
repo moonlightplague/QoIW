@@ -57,6 +57,16 @@ void round_trip() {
     check(fixture::read(max_fields).fields.size() == UINT8_MAX, "maximum field count");
 }
 
+void target_records() {
+    auto stream = sample();
+    stream.targets = {{"sqrt(x)", .25}, {"x*x", .5}};
+    stream.exact_condition = "x > 42";
+    check(write(stream) == fixture::load(QOIW_TARGETS_GOLDEN), "point-wise request differs from golden stream");
+    stream.targets.assign(UINT8_MAX, {"x", 0});
+    const auto bytes = write(stream);
+    check(fixture::read(bytes).targets.size() == UINT8_MAX, "maximum target count");
+}
+
 template <class Edit>
 void invalid(Edit edit, const char* message) {
     auto stream = sample();
@@ -86,6 +96,10 @@ void invalid_inputs() {
     invalid([](Stream& s) { s.dims = {UINT64_MAX}; }, "array byte count overflow accepted");
     invalid([](Stream& s) { s.fields.clear(); }, "empty field list accepted");
     invalid([](Stream& s) { s.fields.resize(256); }, "field count overflow accepted");
+    invalid([](Stream& s) { s.targets.resize(256); }, "target count overflow accepted");
+    invalid([](Stream& s) { s.targets = {{"", 0}}; }, "empty expression accepted");
+    invalid([](Stream& s) { s.targets = {{"x", -1}}; }, "negative tolerance accepted");
+    invalid([](Stream& s) { s.targets = {{"x", std::numeric_limits<double>::infinity()}}; }, "infinite tolerance");
     invalid([](Stream& s) { s.core_name = ""; }, "missing core name accepted");
     invalid([](Stream& s) { s.fields[0].bound = -1; }, "negative bound accepted");
     invalid([](Stream& s) { s.fields[0].data_bound_abs = std::numeric_limits<double>::quiet_NaN(); },
@@ -102,12 +116,14 @@ void invalid_inputs() {
     expect_error<std::length_error>([&] { write(oversized); }, "LOSSLESS size overflow accepted");
     std::string too_long(65536, 'a');
     invalid([&](Stream& s) { s.fields[0].name = too_long; }, "unrepresentable string length accepted");
+    invalid([&](Stream& s) { s.targets = {{too_long, 1}}; }, "unrepresentable expression length accepted");
 }
 }  // namespace
 
 int main() {
     try {
         round_trip();
+        target_records();
         reordered_corrections();
         invalid_inputs();
     } catch (const std::exception& error) {

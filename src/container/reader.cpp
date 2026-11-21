@@ -56,7 +56,15 @@ Stream read_header(ByteReader& input) {
     stream.core_version = read_string(body);
     stream.core_format_version = read_string(body);
     for (unsigned i = 0; i < nfields; ++i) stream.fields.push_back(read_field(body));
-    if (body.u8() != 0) throw UnsupportedFormat("target records are not supported yet");
+    const auto ntargets = body.u8();
+    for (unsigned i = 0; i < ntargets; ++i) {
+        if (body.u8() != kPointwiseTarget) throw UnsupportedFormat("unknown target kind");
+        const auto tolerance = body.f64();
+        if (!valid_bound(tolerance)) throw CorruptStream("invalid target tolerance");
+        const auto expression = read_string(body);
+        if (expression.empty()) throw CorruptStream("empty target expression");
+        stream.targets.push_back({expression, tolerance});
+    }
     stream.exact_condition = read_string(body);
     if (body.remaining() != 0) throw CorruptStream("trailing header bytes");
     return stream;
