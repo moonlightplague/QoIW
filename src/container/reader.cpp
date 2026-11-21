@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <iterator>
 
 #include "common/byte_io.hpp"
 #include "container/format.hpp"

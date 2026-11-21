@@ -60,6 +60,17 @@ std::vector<std::uint8_t> header_body(const Stream& stream) {
 std::vector<std::uint8_t> write(const Stream& stream) {
     auto body = header_body(stream);
     std::vector<std::uint8_t> output;
+    // Reserve once so appending END never forces a copy of a large core stream.
+    const std::size_t framing = 16 + 12 * (stream.fields.size() + 1);
+    const auto limit = output.max_size();
+    if (body.size() > limit - framing) throw std::length_error("container exceeds vector capacity");
+    std::size_t size = body.size() + framing;
+    for (const auto& field : stream.fields) {
+        if (field.core_stream.size && !field.core_stream.data) throw std::invalid_argument("null CORE payload");
+        if (field.core_stream.size > limit - size) throw std::length_error("container exceeds vector capacity");
+        size += field.core_stream.size;
+    }
+    output.reserve(size);
     ByteWriter writer(output);
     writer.bytes(kMagic, sizeof(kMagic));
     writer.u8(kMajor);

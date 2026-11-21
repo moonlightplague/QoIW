@@ -1,5 +1,6 @@
 #include "fixture.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <limits>
 #include <string>
@@ -42,6 +43,15 @@ void round_trip() {
     check(back.fields[1].core_stream.size == 0 && back.fields[1].name == "v", "empty CORE in second field");
     check(write(back) == bytes, "non-deterministic re-encoding");
 
+    // A decoder locates payloads by field ID even when a producer emits them in a different order.
+    auto reordered = bytes;
+    const auto end = reordered.end() - 12;
+    const auto second = end - 12;        // Empty CORE: 12-byte section header.
+    const auto first = second - 15;      // Three payload bytes.
+    std::rotate(first, second, end);
+    auto shuffled = fixture::read(reordered);
+    check(write(shuffled) == bytes, "CORE payload assigned to wrong field");
+
     stream.fields.resize(UINT8_MAX);
     const auto max_fields = write(stream);
     check(fixture::read(max_fields).fields.size() == UINT8_MAX, "maximum field count");
@@ -65,6 +75,9 @@ void invalid_inputs() {
             "NaN data bound accepted");
     invalid([](Stream& s) { s.fields[0].decode_params.size = UINT32_MAX; }, "header size overflow accepted");
     invalid([](Stream& s) { s.fields[0].core_stream = {nullptr, 1}; }, "invalid borrowed payload accepted");
+    auto oversized = sample();
+    oversized.fields[0].core_stream.size = std::numeric_limits<std::size_t>::max();
+    expect_error<std::length_error>([&] { write(oversized); }, "total stream size overflow accepted");
     std::string too_long(65536, 'a');
     invalid([&](Stream& s) { s.fields[0].name = too_long; }, "unrepresentable string length accepted");
 }
