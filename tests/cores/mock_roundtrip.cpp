@@ -93,6 +93,10 @@ void round_trips() {
         params.bound = .25;
         if (c.name == "mock:noise") params.options["factor"] = "3";
         for (const Shape& dims : {Shape{4}, Shape{1, 4}, Shape{2, 1, 2}, Shape{1, 2, 2, 1}}) {
+            const auto kind = mock_core(c.name).traits(dtype<T>, dims.size()).bound_kind;
+            const bool strict = c.name == "mock:identity" || c.name == "mock:quantizer";
+            check(kind == (strict ? qoiw::BoundKind::StrictAbs : qoiw::BoundKind::NominalAbs),
+                  "unexpected mock bound kind");
             auto input = original;
             params.threads = 1;
             const auto reference = pack(c.name, input, dims, params);

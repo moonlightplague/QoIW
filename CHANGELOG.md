@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### M1 point-wise bound shortcuts
+
+- Expose the core's absolute bound kind for frontend tuning. The identity and quantizer mocks declare a strict bound, and the four adversarial mocks use the nominal default.
+
 ### M1 point-wise prior
 
 - Sample the F0 field at QPET's regular stride, combine all point-wise targets, and extract positive, distinct quantile candidates from the sorted estimates.

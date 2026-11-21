@@ -143,6 +143,10 @@ class MockCore final : public Core {
     bool supports(DType dtype, const std::vector<std::uint64_t>& dims) const override {
         return common::array_bytes(dtype, dims) != 0;
     }
+    CoreTraits traits(DType, std::size_t) const override {
+        if (mode_ == Mode::Identity || mode_ == Mode::Quantizer) return {BoundKind::StrictAbs};
+        return {};
+    }
 
     CoreOutput compress(const void* data, DType dtype, const std::vector<std::uint64_t>& dims,
                         const CoreParams& params) const override {
