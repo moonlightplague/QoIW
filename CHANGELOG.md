@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### M1 point-wise prior
+
+- Estimate a local data-error radius from an expression's derivatives, singularities, and breakpoints. Check both endpoints against the resolved tolerance, including non-finite evaluations.
+
 ### M1 point-wise tolerance resolution
 
 - Store each point-wise expression and its resolved absolute tolerance in the checksummed request header. Read these records as metadata and preserve the wire bytes of streams with zero targets.
