@@ -115,8 +115,10 @@ CoreOutput encode(Mode mode, const T* values, std::size_t count, const CoreParam
 }
 
 template <class T>
-void decode_quantized(ByteReader reader, double step, std::size_t count, T* values) {
+void decode_quantized(ByteReader reader, double step, std::size_t count, T* output) {
     if (count > reader.remaining() / 2) throw CorruptStream("truncated mock quantizer stream");
+    // Validate the entire variable-length payload before committing the caller's output.
+    std::vector<T> values(count);
     for (std::size_t i = 0; i < count; ++i) {
         const auto code = reader.u16();
         if (code == 0) {
@@ -128,6 +130,7 @@ void decode_quantized(ByteReader reader, double step, std::size_t count, T* valu
         }
     }
     if (reader.remaining()) throw CorruptStream("trailing mock quantizer bytes");
+    std::memcpy(output, values.data(), count * sizeof(T));
 }
 
 class MockCore final : public Core {

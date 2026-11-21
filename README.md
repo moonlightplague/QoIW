@@ -41,5 +41,25 @@ views into the input buffer for strings and payloads, so callers must retain the
 buffer while using the parsed stream.
 
 The reader skips informational extensions and rejects unsupported correction
-layers. Mock-core decoding is the next step toward the M0 round trip. The format
-freeze is scheduled for M1 and decoded-value fingerprint verification for M3.
+layers. The format freeze is scheduled for M1 and decoded-value fingerprint
+verification for M3.
+
+## Mock cores
+
+The M0 integration test wraps the output of a test core in an empty-request
+container, then selects the decoder by the stored core name. Run it with
+`ctest --test-dir build -R core.mock_roundtrip --output-on-failure`.
+The adapters build with `QOIW_BUILD_TESTS=ON`.
+
+| Core | Decoded values |
+| --- | --- |
+| `mock:identity` | Original IEEE bits, including signed zero and NaN payloads. |
+| `mock:quantizer` | Nearest multiple of twice the bound, with halfway cases rounded away from zero. The stream stores exact bits for exceptional values, out-of-range indices, and reconstructions that would exceed the bound after storage rounding. |
+| `mock:noise` | Alternating positive and negative offsets of `factor * bound`. Set the `factor` core option to a number greater than 1. The default is 2. |
+| `mock:garbage` | Alternating +1 and −1 regardless of input. |
+| `mock:signflip` | Flipped signs where the absolute input value is at most the bound. |
+| `mock:nan` | Quiet NaNs at even flat indices, starting at zero. |
+
+The quantizer golden stream contains a 1 × 4 float32 array compressed at bound
+0.25. Its stored step of 0.5 and signed indices −3, −1, 0, 2 reconstruct
+−1.5, −0.5, 0, 1. The test checks both the wire bytes and these decoded values.

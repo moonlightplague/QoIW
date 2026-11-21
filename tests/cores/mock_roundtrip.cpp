@@ -148,8 +148,14 @@ void invalid_inputs() {
     expect_error<CorruptStream>([&] { decode(view(encoded.stream), {}, 4); }, "missing step accepted");
     expect_error<CorruptStream>([&] { decode({}, view(encoded.decode_params), 4); }, "missing code accepted");
     expect_error<CorruptStream>([&] { decode(view(Buffer{0, 0}), view(encoded.decode_params), 4); }, "missing escape");
+    Buffer invalid_step(8, 0xff);
+    expect_error<CorruptStream>([&] { decode(view(encoded.stream), view(invalid_step), 4); }, "NaN step accepted");
+    invalid_step.assign(8, 0);
+    expect_error<CorruptStream>([&] { decode(view(encoded.stream), view(invalid_step), 4); }, "index at zero step");
+    value = 23;
     encoded.stream.push_back(0);
     expect_error<CorruptStream>([&] { decode(view(encoded.stream), view(encoded.decode_params), 4); }, "trailing bytes");
+    check(value == 23, "malformed payload changed output");
     expect_error<CorruptStream>([&] { mock_core("mock:identity").decompress({}, {}, DType::Float32, {1}, 1, &value, 4); },
                                 "short raw stream accepted");
     for (const char* factor : {"1", "-2", "nan", "3x"}) {
