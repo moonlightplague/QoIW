@@ -14,7 +14,8 @@ foreach(part reader writer)
     add_executable(qoiw_test_container_${part} unit/container/${part}.cpp)
     qoiw_configure_target(qoiw_test_container_${part})
     target_compile_definitions(qoiw_test_container_${part} PRIVATE
-        QOIW_GOLDEN_FILE="${CMAKE_CURRENT_SOURCE_DIR}/golden/m0-core.qoiw")
+        QOIW_GOLDEN_FILE="${CMAKE_CURRENT_SOURCE_DIR}/golden/m0-core.qoiw"
+        QOIW_TARGETS_GOLDEN="${CMAKE_CURRENT_SOURCE_DIR}/golden/m1-point-targets.qoiw")
     add_test(NAME container.${part} COMMAND qoiw_test_container_${part})
 endforeach()
 target_link_libraries(qoiw_test_container_reader PRIVATE qoiw_decode)

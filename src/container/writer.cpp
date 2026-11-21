@@ -50,7 +50,15 @@ std::vector<std::uint8_t> header_body(const Stream& stream) {
         writer.bytes(field.decode_params.data, field.decode_params.size);
         writer.u64(field.fingerprint);
     }
-    writer.u8(0);  // No target records in the M0 format.
+    if (stream.targets.size() > UINT8_MAX) throw std::invalid_argument("too many target records");
+    writer.u8(static_cast<std::uint8_t>(stream.targets.size()));
+    for (const auto& target : stream.targets) {
+        if (target.expression.empty() || !valid_bound(target.tolerance_abs))
+            throw std::invalid_argument("invalid point-wise target record");
+        writer.u8(kPointwiseTarget);
+        writer.f64(target.tolerance_abs);
+        write_string(writer, target.expression);
+    }
     write_string(writer, stream.exact_condition);
     if (body.size() > UINT32_MAX) throw std::invalid_argument("header exceeds u32 length");
     return body;

@@ -4,8 +4,9 @@ QoIW is a C++17 wrapper under development for preserving quantities of interest
 when compressing fixed-grid scientific arrays. The libraries include a
 single-variable expression engine, a sectioned container, and a lossless
 correction layer that restores selected values after core decompression.
-The encoder can select corrections from point-wise constraints. The frontend,
-SZ3 adapter, and CLI are planned for M1.
+The encoder resolves point-wise tolerances from the original field and checks
+them against the core reconstruction. Bound prediction, the SZ3 adapter, and
+the CLI are in development for M1.
 [Development plan](PLAN.md)
 
 ## Build and test
@@ -45,7 +46,10 @@ and calls its compressed-size bound function to check linkage.
 
 The provisional version 0.0 stream carries C-order dimensions, per-field bounds,
 opaque decode parameters, fingerprint metadata, and one CORE section per field.
-It currently accepts requests with zero target records.
+Its request header records each point-wise expression and its resolved absolute
+tolerance. A point-wise record consists of kind byte `0x01`, a little-endian
+float64 tolerance, and the expression text prefixed by its little-endian
+`u16` byte length. The decoder reads the text as metadata.
 The reader checks the header CRC32C before interpreting its contents. It returns
 views into the input buffer for strings and payloads, so callers must retain the
 buffer while using the parsed stream.
@@ -113,6 +117,19 @@ nesting, 512 levels in the folded syntax tree, and 64 evaluation stack slots.
 The parser, bytecode evaluation, differentiation, and reference tests are
 adapted from public QPET commit `a80e6861fc15e7a66eb1f36b6172911a541b9d3c`.
 [QPET BSD 3-Clause license](LICENSES/QPET.txt)
+
+### Resolving point-wise tolerances
+
+Frontend step F0 scans the original field and computes each relative tolerance
+as its specified fraction times the finite range of that target. A relative
+data bound uses the range of the input itself. Absolute tolerances pass through
+directly. If a range is constant or contains no eligible values, the specified
+fraction becomes the absolute tolerance.
+
+An exact condition such as `x > 1e30` excludes fill values from every range.
+NaN and infinite inputs are also excluded. At a finite, unmasked input where
+one expression is undefined, the other targets still contribute their finite
+values to their own ranges. F0 marks that input for exact preservation.
 
 ## Reference benchmarks
 

@@ -22,7 +22,7 @@ void golden(const Buffer& bytes) {
     check(stream.dtype == qoiw::DType::Float32 && stream.dims == std::vector<std::uint64_t>{1, 3}, "shape");
     check(stream.wrapper_version == "m0" && stream.core_name == "fixture" &&
               stream.core_version == "1" && stream.core_format_version == "0", "versions");
-    check(stream.fields.size() == 1 && stream.exact_condition.empty(), "request");
+    check(stream.fields.size() == 1 && stream.exact_condition.empty() && stream.targets.empty(), "request");
     const auto& field = stream.fields[0];
     check(field.name == "x" && field.bound == .25 && field.data_bound_abs == .5, "field bounds");
     check(field.fingerprint == 0x123456789abcdef0ULL, "fingerprint");
@@ -34,8 +34,9 @@ void golden(const Buffer& bytes) {
 }
 
 void repair_crc(Buffer& bytes) {
-    const auto crc = qoiw::common::crc32c(bytes.data() + kBody, kCore - 4 - kBody);
-    for (unsigned i = 0; i < 4; ++i) bytes[kCore - 4 + i] = static_cast<std::uint8_t>(crc >> (8 * i));
+    const auto length = qoiw::common::ByteReader(bytes.data() + 8, 4).u32();
+    const auto crc = qoiw::common::crc32c(bytes.data() + kBody, length);
+    for (unsigned i = 0; i < 4; ++i) bytes.at(kBody + length + i) = static_cast<std::uint8_t>(crc >> (8 * i));
 }
 
 template <class Error = CorruptStream>
@@ -44,6 +45,22 @@ void reject_byte(const Buffer& golden_bytes, std::size_t index, std::uint8_t val
     bytes.at(index) = value;
     if (update_crc) repair_crc(bytes);
     expect_error<Error>([&] { fixture::read(bytes); }, "malformed fixture accepted");
+}
+
+void target_records() {
+    const auto bytes = fixture::load(QOIW_TARGETS_GOLDEN);
+    const auto stream = fixture::read(bytes);
+    check(stream.targets.size() == 2 && stream.exact_condition == "x > 42", "point-wise request header");
+    const auto& first = stream.targets[0];
+    check(first.expression == "sqrt(x)" && first.tolerance_abs == .25, "first point-wise target");
+    check(stream.targets[1].expression == "x*x" && stream.targets[1].tolerance_abs == .5, "second point-wise target");
+    constexpr auto kind = kCore - 6;
+    check(reinterpret_cast<const std::uint8_t*>(first.expression.data()) == bytes.data() + kind + 11,
+          "borrowed expression text");
+    reject_byte<UnsupportedFormat>(bytes, kind, 0xff, true);
+    reject_byte(bytes, kind + 8, 0xbf, true);  // Set the sign of the first tolerance.
+    reject_byte(bytes, kind + 9, 0, true);     // Empty expression.
+    reject_byte(bytes, kind + 10, 0xff, true); // String exceeds header.
 }
 
 void header_errors(const Buffer& bytes) {
@@ -64,7 +81,7 @@ void header_errors(const Buffer& bytes) {
     reject_byte(bytes, kBound + 7, 0xbf, true);  // Negative core bound.
     reject_byte<UnsupportedFormat>(bytes, kBound + 16, 2, true);
     reject_byte(bytes, kBound + 20, 255, true);  // Decode-params length exceeds body.
-    reject_byte<UnsupportedFormat>(bytes, kCore - 7, 1, true);  // Target records require a later reader.
+    reject_byte<UnsupportedFormat>(bytes, kCore - 7, 1, true);  // The next byte is not a known target kind.
 }
 
 void sections(const Buffer& golden_bytes) {
@@ -111,6 +128,7 @@ int main() {
         auto bytes = fixture::load();
         check(bytes.size() == kEnd + 12, "unexpected golden fixture length");
         golden(bytes);
+        target_records();
         header_errors(bytes);
         sections(bytes);
     } catch (const std::exception& error) {

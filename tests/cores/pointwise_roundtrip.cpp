@@ -6,6 +6,7 @@
 
 #include "backend/pointwise.hpp"
 #include "core/adapters/mock.hpp"
+#include "frontend/resolve.hpp"
 #include "pipeline/decode_field.hpp"
 
 namespace {
@@ -40,7 +41,13 @@ void round_trip() {
     original[2049] = static_cast<T>(1e36);
     original.back() = std::numeric_limits<T>::denorm_min();
     const auto bytes = original.size() * sizeof(T);
-    const qoiw::ResolvedPointRequest request{{{Expr("ln(x)"), 0.5}, {Expr("x^2"), 1.}}, 0.25, Expr("x > 1e30")};
+    using Mode = qoiw::frontend::Tolerance::Mode;
+    // The finite, unmasked field spans 3, and x^2 spans 361/64.
+    const qoiw::frontend::PointRequest spec{{{Expr("ln(x)"), {Mode::Absolute, .5}},
+                                              {Expr("x^2"), {Mode::Relative, 64. / 361}}},
+                                             qoiw::frontend::Tolerance{Mode::Relative, 1. / 12}, Expr("x > 1e30")};
+    const auto resolved = qoiw::frontend::resolve_pointwise(dtype, original.data(), bytes, spec, 2);
+    const auto& request = resolved.request;
 
     for (auto name : {"mock:identity", "mock:quantizer", "mock:noise", "mock:garbage", "mock:signflip", "mock:nan"}) {
         const auto& core = qoiw::test::mock_core(name);
@@ -74,12 +81,18 @@ void round_trip() {
             stream.core_version = core.version();
             stream.core_format_version = core.format_version();
             stream.exact_condition = request.exact->text();
+            for (const auto& target : request.targets)
+                stream.targets.push_back({target.expression.text(), target.tolerance_abs});
             stream.fields = {{"x", params.bound, request.data_bound_abs, view(payload.decode_params), 0,
                               view(payload.stream), view(corrections.lossless)}};
             const auto blob = qoiw::container::write(stream);
             if (threads == 1) serial_stream = blob;
             if (blob != serial_stream) throw std::runtime_error(std::string(name) + " stream differs by thread count");
             const auto parsed = qoiw::container::read(view(blob));
+            if (parsed.fields[0].data_bound_abs != .25 || parsed.targets.size() != 2 ||
+                parsed.targets[0].expression != "ln(x)" || parsed.targets[0].tolerance_abs != .5 ||
+                parsed.targets[1].expression != "x^2" || parsed.targets[1].tolerance_abs != 1.)
+                throw std::runtime_error("stored tolerances differ from scalar reference");
             std::vector<T> output(original.size());
             const auto count = qoiw::pipeline::decode_field(parsed, 0, qoiw::test::mock_core(parsed.core_name),
                                                             threads, output.data(), bytes);
