@@ -5,6 +5,12 @@
 
 namespace qoiw::common {
 
+void ByteWriter::bytes(const std::uint8_t* data, std::size_t size) {
+    if (size == 0) return;
+    if (!data) throw std::invalid_argument("null source buffer");
+    output_.insert(output_.end(), data, data + size);
+}
+
 void ByteWriter::u8(std::uint8_t value) { output_.push_back(value); }
 
 template <class UInt>
