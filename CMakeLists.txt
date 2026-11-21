@@ -10,7 +10,12 @@ add_library(qoiw_decode STATIC src/common/byte_reader.cpp src/container/reader.c
 target_include_directories(qoiw_decode PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
 qoiw_configure_target(qoiw_decode)
 
-add_library(qoiw STATIC src/common/byte_writer.cpp src/container/writer.cpp)
+add_library(qoiw STATIC
+    src/common/byte_writer.cpp
+    src/container/writer.cpp
+    src/expr/compiler.cpp
+    src/expr/evaluate.cpp
+    src/expr/jet.cpp)
 add_library(QOIW::qoiw ALIAS qoiw)
 qoiw_configure_target(qoiw)
 target_link_libraries(qoiw PUBLIC qoiw_decode)

@@ -31,3 +31,13 @@ target_link_libraries(qoiw_test_mock_roundtrip PRIVATE qoiw_mock_cores QOIW::qoi
 target_compile_definitions(qoiw_test_mock_roundtrip PRIVATE
     QOIW_MOCK_GOLDEN="${CMAKE_CURRENT_SOURCE_DIR}/golden/m0-mock-quantizer.qoiw")
 add_test(NAME core.mock_roundtrip COMMAND qoiw_test_mock_roundtrip)
+
+add_executable(qoiw_test_expr_reference unit/expr/reference.cpp)
+qoiw_configure_target(qoiw_test_expr_reference)
+target_link_libraries(qoiw_test_expr_reference PRIVATE QOIW::qoiw)
+add_test(NAME expr.reference COMMAND qoiw_test_expr_reference)
+
+add_executable(qoiw_test_expr_edges unit/expr/edge_cases.cpp)
+qoiw_configure_target(qoiw_test_expr_edges)
+target_link_libraries(qoiw_test_expr_edges PRIVATE QOIW::qoiw Threads::Threads)
+add_test(NAME expr.edges COMMAND qoiw_test_expr_edges)
