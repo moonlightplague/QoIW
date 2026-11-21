@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### M1 candidate measurement
+
+- Estimate the distribution of tolerable radii within F3 blocks using the full-field range, resolved target tolerances, and exact predicate.
+
 ### M1 point-wise block sampling
 
 - Prepare blocks alongside the full-field prior for requests that need measurement. Validate the input shape before resolution and skip sampling for all three bound shortcuts.
