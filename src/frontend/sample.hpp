@@ -1,5 +1,6 @@
 #pragma once
 
+#include <variant>
 #include <vector>
 
 #include "qoiw/types.hpp"
@@ -20,5 +21,14 @@ struct BlockLayout {
 
 BlockLayout plan_blocks(DType dtype, const std::vector<std::uint64_t>& dims,
                         const BlockSamplingOptions& options = {});
+
+struct BlockSample {
+    BlockLayout layout;
+    // Each owned, contiguous array has layout.dims and the original storage type.
+    std::variant<std::vector<std::vector<float>>, std::vector<std::vector<double>>> blocks;
+};
+
+BlockSample sample_blocks(DType dtype, const void* original, std::size_t array_bytes,
+                          const std::vector<std::uint64_t>& dims, int threads, const BlockSamplingOptions& options = {});
 
 }  // namespace qoiw::frontend

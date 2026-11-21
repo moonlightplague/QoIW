@@ -2,9 +2,12 @@
 #include "frontend/sample.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstring>
 #include <stdexcept>
 
+#include "common/parallel_for.hpp"
 #include "common/shape.hpp"
 
 namespace qoiw::frontend {
@@ -20,6 +23,41 @@ double halton(std::size_t index, unsigned base) {
         value += fraction * (index % base);
     }
     return value;
+}
+
+template <class T>
+std::vector<std::vector<T>> copy_blocks(const T* original, const std::vector<std::uint64_t>& dims,
+                                        const BlockLayout& layout, int threads) {
+    std::array<std::size_t, 4> strides{};
+    strides[dims.size() - 1] = 1;
+    for (auto d = dims.size() - 1; d > 0; --d) strides[d - 1] = strides[d] * dims[d];
+
+    // Fold full trailing dimensions into each memcpy. A whole-field sample
+    // takes one copy even when the fastest dimension has just one element.
+    auto outer = dims.size() - 1;
+    std::size_t row_values = layout.dims[outer];
+    while (outer > 0 && layout.dims[outer] == dims[outer]) {
+        --outer;
+        row_values *= layout.dims[outer];
+    }
+    std::size_t rows = 1;
+    for (std::size_t d = 0; d < outer; ++d) rows *= layout.dims[d];
+
+    std::vector<std::vector<T>> blocks(layout.origins.size());
+    common::parallel_for(blocks.size(), threads, [&](std::size_t k) {
+        auto& block = blocks[k];
+        block.resize(rows * row_values);
+        for (std::size_t row = 0; row < rows; ++row) {
+            auto offset = layout.origins[k];
+            auto index = row;
+            for (auto d = outer; d > 0; --d) {
+                offset += (index % layout.dims[d - 1]) * strides[d - 1];
+                index /= layout.dims[d - 1];
+            }
+            std::memcpy(block.data() + row * row_values, original + offset, row_values * sizeof(T));
+        }
+    });
+    return blocks;
 }
 }  // namespace
 
@@ -64,6 +102,19 @@ BlockLayout plan_blocks(DType dtype, const std::vector<std::uint64_t>& dims, con
         layout.origins[k] = origin;
     }
     return layout;
+}
+
+BlockSample sample_blocks(DType dtype, const void* original, std::size_t array_bytes,
+                          const std::vector<std::uint64_t>& dims, int threads, const BlockSamplingOptions& options) {
+    if (!original || !array_bytes || array_bytes != common::array_bytes(dtype, dims) || threads < 0)
+        throw std::invalid_argument("invalid field or thread count for block sampling");
+    BlockSample sample{plan_blocks(dtype, dims, options), {}};
+    if (dtype == DType::Float32) {
+        sample.blocks = copy_blocks(static_cast<const float*>(original), dims, sample.layout, threads);
+    } else {
+        sample.blocks = copy_blocks(static_cast<const double*>(original), dims, sample.layout, threads);
+    }
+    return sample;
 }
 
 }  // namespace qoiw::frontend

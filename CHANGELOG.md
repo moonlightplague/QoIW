@@ -4,6 +4,7 @@
 
 ### M1 point-wise block sampling
 
+- Copy the selected float32 or float64 blocks into owned arrays in C order, preserving signed zeros and NaN payloads across thread counts.
 - Select deterministic C-order sample blocks with QPET's Halton sequence and rank-specific defaults. Use the whole field when the planned sample reaches half the input.
 
 ### M1 point-wise bound shortcuts
