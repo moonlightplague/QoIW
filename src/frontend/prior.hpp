@@ -17,7 +17,7 @@ struct PriorOptions {
 struct PointPrior {
     std::size_t stride;
     std::vector<double> sorted_radii;  // Includes zeros for exact samples.
-    std::vector<double> candidates;    // Positive distinct quantiles, in ascending order.
+    std::vector<double> candidates;    // Sorted positive quantiles, or the first positive radius if all miss.
 };
 
 // Sample the same original field passed to F0. The result seeds the search.

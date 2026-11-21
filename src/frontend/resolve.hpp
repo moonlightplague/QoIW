@@ -24,6 +24,8 @@ struct PointRequest {
 
 struct Range {
     double min, max;
+    // Scale the width even when subtracting opposite finite extremes overflows.
+    double scaled_width(double scale) const;
 };
 
 struct PointResolution {

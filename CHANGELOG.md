@@ -4,6 +4,7 @@
 
 ### M1 point-wise bound shortcuts
 
+- Select fixed bounds, a capped fallback for all-zero sampled radii, or a single candidate for strict cores with affine constraints. Preserve the sampled distribution and a positive candidate for requests that need measurement.
 - Expose the core's absolute bound kind for frontend tuning. The identity and quantizer mocks declare a strict bound, and the four adversarial mocks use the nominal default.
 
 ### M1 point-wise prior

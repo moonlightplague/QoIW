@@ -25,7 +25,8 @@ add_library(qoiw STATIC
     src/expr/evaluate.cpp
     src/expr/jet.cpp
     src/frontend/resolve.cpp
-    src/frontend/prior.cpp)
+    src/frontend/prior.cpp
+    src/frontend/prepare.cpp)
 add_library(QOIW::qoiw ALIAS qoiw)
 qoiw_configure_target(qoiw)
 target_link_libraries(qoiw PUBLIC qoiw_decode PRIVATE ${QOIW_ZSTD_TARGET})
