@@ -18,6 +18,7 @@ qoiw_configure_target(qoiw_decode)
 
 add_library(qoiw STATIC
     src/backend/lossless_encode.cpp
+    src/backend/pointwise.cpp
     src/common/byte_writer.cpp
     src/container/writer.cpp
     src/expr/compiler.cpp
@@ -26,6 +27,10 @@ add_library(qoiw STATIC
 add_library(QOIW::qoiw ALIAS qoiw)
 qoiw_configure_target(qoiw)
 target_link_libraries(qoiw PUBLIC qoiw_decode PRIVATE ${QOIW_ZSTD_TARGET})
+find_package(OpenMP QUIET COMPONENTS CXX)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(qoiw PRIVATE OpenMP::OpenMP_CXX)
+endif()
 
 option(QOIW_BUILD_TESTS "Build QoIW tests" ON)
 if(QOIW_BUILD_TESTS)

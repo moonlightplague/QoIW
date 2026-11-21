@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### M1 point-wise correction pass
+
+- Check the corrected float32 and float64 fields from all six mock cores against independent scalar expectations and fresh container decodes across thread counts.
+- Run the parallel backend under Clang ThreadSanitizer with LLVM Archer in CI so the race detector can observe OpenMP barriers.
+- Compare the core's decoded field against resolved data and QoI tolerances and an optional exact condition. Encode violations in increasing index order and apply the resulting lossless layer to the reconstruction.
+
 ### M1 lossless corrections
 
 - Store optional per-field LOSSLESS sections and restore their values after core decompression in the decode library. Preserve the existing core-only wire fixtures.

@@ -4,7 +4,8 @@ QoIW is a C++17 wrapper under development for preserving quantities of interest
 when compressing fixed-grid scientific arrays. The libraries include a
 single-variable expression engine, a sectioned container, and a lossless
 correction layer that restores selected values after core decompression.
-Point-wise outlier selection, the SZ3 adapter, and the CLI are planned for M1.
+The encoder can select corrections from point-wise constraints. The frontend,
+SZ3 adapter, and CLI are planned for M1.
 [Development plan](PLAN.md)
 
 ## Build and test
@@ -29,6 +30,11 @@ cmake --build build --parallel
 | `QOIW_BUILD_TESTS=OFF` | Build only the libraries. |
 | `QOIW_WARNINGS_AS_ERRORS=ON` | Treat QoIW warnings as errors under GCC and Clang. |
 | `QOIW_SANITIZE=address`, `undefined`, or `thread` | Instrument a build with one sanitizer. The default is `none`. |
+
+The encoder uses OpenMP when available. Configure with
+`-DCMAKE_DISABLE_FIND_PACKAGE_OpenMP=ON` for a serial build. The
+ThreadSanitizer job uses Clang and LLVM Archer so the race detector observes
+OpenMP synchronization. [LLVM Archer documentation](https://github.com/llvm/llvm-project/blob/release/18.x/openmp/tools/archer/README.md)
 
 The common tests use known byte sequences and the CRC32C check value for
 `123456789`. The container tests cover a fixed wire fixture, truncated inputs,
@@ -58,6 +64,15 @@ layer and overwrites the selected values. The stored corrected-stream fixture
 checks restoration of negative zero and a specific NaN payload. The original
 M0 fixtures continue to check core-only streams. The format freeze is scheduled
 for M1 and decoded-value fingerprint verification for M3.
+
+The encoder's point-wise pass takes one original field, its core reconstruction
+in the same storage type, compiled target expressions with absolute tolerances,
+and optional data and exact-value constraints. It compares in double precision.
+A changed value needs restoration if it exceeds any bound, either value is
+non-finite, either QoI result is non-finite, or either value satisfies the exact
+condition. The pass applies its serialized corrections to the reconstruction,
+so the encoder sees the same final bits as a reader. The
+`core.pointwise_roundtrip` test checks this for all six mock cores.
 
 ## Mock cores
 
