@@ -6,9 +6,13 @@
 #include <limits>
 #include <stdexcept>
 
+#include "common/parallel_for.hpp"
+#include "common/shape.hpp"
+
 namespace qoiw::frontend {
 namespace {
 constexpr double infinity = std::numeric_limits<double>::infinity();
+constexpr std::size_t default_samples = 1u << 20;
 
 // Positive root of slope*e + curvature*e^2/2 = tolerance.
 double taylor_radius(double slope, double curvature, double tolerance) {
@@ -77,6 +81,57 @@ double pointwise_radius(const PointTarget& target, double x, double cap) {
         radius = next < radius ? next : radius * .5;
     }
     return 0;
+}
+
+PointPrior estimate_point_prior(DType dtype, const void* original, std::size_t array_bytes,
+                                const PointResolution& resolved, int threads, const PriorOptions& options) {
+    const auto width = common::element_bytes(dtype);
+    if (!width || !original || !array_bytes || array_bytes % width || threads < 0)
+        throw std::invalid_argument("invalid field or thread count for point-wise prior");
+    const auto count = array_bytes / width;
+    if (resolved.exact_mask.size() != 1 + (count - 1) / 64)
+        throw std::invalid_argument("exact mask does not cover the field");
+    static const std::vector<double> default_quantiles{0, .0025, .005, .01, .02, .05, .1, .2, .5, 1};
+    const auto& quantiles = options.quantiles.empty() ? default_quantiles : options.quantiles;
+    for (double q : quantiles) {
+        if (!(q >= 0 && q <= 1)) throw std::invalid_argument("prior quantile outside [0,1]");
+    }
+
+    // Only a finite bound can be passed to a core, even if subtracting the
+    // extreme finite values of a field overflows.
+    const auto& range = resolved.data_range;
+    const double span = range ? range->max - range->min : 0.;
+    const double cap = std::min(span, resolved.request.data_bound_abs.value_or(std::numeric_limits<double>::max()));
+    const auto samples = options.point_samples ? options.point_samples : default_samples;
+    PointPrior result;
+    result.stride = std::max<std::size_t>(1, count / samples);
+    result.sorted_radii.resize(1 + (count - 1) / result.stride);
+    if (cap > 0) {
+        common::parallel_for(result.sorted_radii.size(), threads, [&](std::size_t i) {
+            const auto index = i * result.stride;
+            if ((resolved.exact_mask[index / 64] >> (index % 64)) & 1u) return;
+            const double x = dtype == DType::Float32 ? static_cast<const float*>(original)[index]
+                                                     : static_cast<const double*>(original)[index];
+            double radius = cap;
+            for (const auto& target : resolved.request.targets) {
+                radius = std::min(radius, pointwise_radius(target, x, cap));
+                if (radius == 0) break;
+            }
+            result.sorted_radii[i] = radius;
+        });
+        std::sort(result.sorted_radii.begin(), result.sorted_radii.end());
+    }
+
+    const auto n = result.sorted_radii.size();
+    for (double q : quantiles) {
+        const auto index = std::min(n - 1, static_cast<std::size_t>(q * n));
+        const double radius = result.sorted_radii[index];
+        if (radius > 0) result.candidates.push_back(radius);
+    }
+    auto& candidates = result.candidates;
+    std::sort(candidates.begin(), candidates.end());
+    candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
+    return result;
 }
 
 }  // namespace qoiw::frontend

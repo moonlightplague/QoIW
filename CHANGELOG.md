@@ -4,6 +4,7 @@
 
 ### M1 point-wise prior
 
+- Sample the F0 field at QPET's regular stride, combine all point-wise targets, and extract positive, distinct quantile candidates from the sorted estimates.
 - Estimate a local data-error radius from an expression's derivatives, singularities, and breakpoints. Check both endpoints against the resolved tolerance, including non-finite evaluations.
 
 ### M1 point-wise tolerance resolution
