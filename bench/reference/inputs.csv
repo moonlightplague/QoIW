@@ -1,0 +1,23 @@
+dataset,dtype,c_shape,path,fields
+Hurricane,<f4,100x500x500,Hurricane/{field}f48.bin.f32,U V W TC P QVAPOR CLOUD PRECIP QCLOUD QGRAUP QICE QRAIN QSNOW
+Hurricane,<f4,100x500x500,Hurricane/{field}f48.log10.bin.f32,CLOUD PRECIP QCLOUD QGRAUP QICE QRAIN QSNOW
+Miranda,<f8,256x384x384,Miranda/{field}.d64,density pressure velocityx velocityy velocityz diffusivity viscocity
+Miranda_f32,<f4,256x384x384,Miranda_f32/{field}.f32,density pressure velocityx
+NYX,<f4,512x512x512,NYX/{field}.f32,baryon_density temperature dark_matter_density velocity_x velocity_y velocity_z
+SCALE,<f4,98x1200x1200,SCALE/{field}-98x1200x1200.f32,PRES QC QG QI QR QS QV RH T U V W
+CESM,<f4,1800x3600,CESM/{field}_1_1800_3600.f32,CLDHGH TROP_Z PRECSC FSNSC ICEFRAC PSL TGCLDLWP TS PRECT AEROD_v ODV_dust1
+CESM-3D,<f4,26x1800x3600,CESM-3D/SDRBENCH-CESM-ATM-26x1800x3600/{field}_1_26_1800_3600.f32,T U V Q RELHUM CLOUD OMEGA Z3 CLDLIQ QRS
+S3D,<f8,500x500x500,S3D/fields/1.1000E-03/{field}_500x500x500.d64,T U V W Y_O2 Y_CO2 Y_H2O Y_CH4
+S3D,<f8,500x500x500,S3D/fields/2.3500E-03/{field}_500x500x500.d64,T U V W Y_O2 Y_CO2 Y_H2O Y_CH4
+EXAFEL,<f4,130x1480x1552,EXAFEL/SDRBENCH-EXAFEL-130x1480x1552/SDRBENCH-EXAFEL-data-130x1480x1552.f32,
+EXAFEL,<f4,986x32x185x388,EXAFEL/SDRBENCH-EXAFEL-986x32x185x388/EXAFEL-LCLS-986x32x185x388.f32,
+Basilisk,<f4,1501x1024x1024,Basilisk-Turbulence/SDRBENCH-Basilisk-Turbulence/{field}_1024x1024x1501Re10k.f32,u v
+Basilisk,<f4,1001x2048x2048,Basilisk-Turbulence/SDRBENCH-Basilisk-Turbulence/{field}_2048x2048x1001Re10k.f32,u v
+HACC,<f4,280953867,HACC/EXASKY-HACC-data-medium-size/{field}.f32,xx yy zz vx vy vz
+EXAALT,<f4,2869440,EXAALT/SDRBENCH-EXAALT-2869440/{field}.f32,xx yy zz vx vy vz
+NWChem,<f8,102953248,NWChem/631-tst.bin.d64,
+NWChem,<f8,801098891,NWChem/acd-tst.bin.d64,
+NWChem,<f8,712996037,NWChem/ccd-tst.bin.d64,
+JHTDB,<f4,512x512x512,JHTDB/velocity/0500_{field}.dat,vx vy vz
+JHTDB,<f4,512x512x512,JHTDB/velocity/5000_{field}.dat,vx vy vz
+JHTDB,<f4,512x512x512,JHTDB/pressure/{field}_pressure.f32,0500 5000

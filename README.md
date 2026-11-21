@@ -84,3 +84,8 @@ nesting, 512 levels in the folded syntax tree, and 64 evaluation stack slots.
 The parser, bytecode evaluation, differentiation, and reference tests are
 adapted from public QPET commit `a80e6861fc15e7a66eb1f36b6172911a541b9d3c`.
 [QPET BSD 3-Clause license](LICENSES/QPET.txt)
+
+## Reference benchmarks
+
+The M0 benchmark guide gives the pinned QPET build, the independently checked
+Hurricane result, and the field inventory for parity testing. [Reference baseline](bench/reference/README.md)
