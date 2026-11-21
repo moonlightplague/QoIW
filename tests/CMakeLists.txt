@@ -57,3 +57,8 @@ add_executable(qoiw_test_pointwise_roundtrip cores/pointwise_roundtrip.cpp)
 qoiw_configure_target(qoiw_test_pointwise_roundtrip)
 target_link_libraries(qoiw_test_pointwise_roundtrip PRIVATE qoiw_mock_cores QOIW::qoiw)
 add_test(NAME core.pointwise_roundtrip COMMAND qoiw_test_pointwise_roundtrip)
+
+add_executable(qoiw_test_resolve unit/frontend/resolve.cpp)
+qoiw_configure_target(qoiw_test_resolve)
+target_link_libraries(qoiw_test_resolve PRIVATE QOIW::qoiw)
+add_test(NAME frontend.resolve COMMAND qoiw_test_resolve)

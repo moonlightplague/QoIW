@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### M1 point-wise tolerance resolution
+
+- Resolve absolute and relative tolerances in one parallel pass over a field. Report finite data and QoI ranges, count non-finite inputs, and identify original values that require exact preservation.
+
 ### M1 point-wise correction pass
 
 - Check the corrected float32 and float64 fields from all six mock cores against independent scalar expectations and fresh container decodes across thread counts.
