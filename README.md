@@ -4,7 +4,8 @@ QoIW is a C++17 wrapper under development for preserving quantities of interest
 when compressing fixed-grid scientific arrays. The libraries include a
 single-variable expression engine, a sectioned container, and a lossless
 correction layer that restores selected values after core decompression.
-Point-wise outlier selection, the SZ3 adapter, and the CLI are planned for M1.
+The encoder can select corrections from point-wise constraints. The frontend,
+SZ3 adapter, and CLI are planned for M1.
 [Development plan](PLAN.md)
 
 ## Build and test
@@ -63,6 +64,15 @@ layer and overwrites the selected values. The stored corrected-stream fixture
 checks restoration of negative zero and a specific NaN payload. The original
 M0 fixtures continue to check core-only streams. The format freeze is scheduled
 for M1 and decoded-value fingerprint verification for M3.
+
+The encoder's point-wise pass takes one original field, its core reconstruction
+in the same storage type, compiled target expressions with absolute tolerances,
+and optional data and exact-value constraints. It compares in double precision.
+A changed value needs restoration if it exceeds any bound, either value is
+non-finite, either QoI result is non-finite, or either value satisfies the exact
+condition. The pass applies its serialized corrections to the reconstruction,
+so the encoder sees the same final bits as a reader. The
+`core.pointwise_roundtrip` test checks this for all six mock cores.
 
 ## Mock cores
 
