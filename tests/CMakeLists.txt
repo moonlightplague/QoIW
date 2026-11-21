@@ -1,0 +1,11 @@
+add_executable(qoiw_test_byte_io unit/common/byte_io.cpp)
+qoiw_configure_target(qoiw_test_byte_io)
+target_link_libraries(qoiw_test_byte_io PRIVATE QOIW::qoiw)
+add_test(NAME common.byte_io COMMAND qoiw_test_byte_io)
+
+if(QOIW_CORE_SZ3)
+    add_executable(qoiw_test_sz3_build cores/sz3_build.cpp)
+    qoiw_configure_target(qoiw_test_sz3_build)
+    target_link_libraries(qoiw_test_sz3_build PRIVATE SZ3::SZ3)
+    add_test(NAME core.sz3_build COMMAND qoiw_test_sz3_build)
+endif()
