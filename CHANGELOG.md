@@ -4,6 +4,7 @@
 
 ### M1 point-wise bound search
 
+- Enforce the resolved data bound for strict cores and choose the smallest bound within the configured cost tolerance. Prefer the data bound within that band when the sample needs zero restorations.
 - Measure distinct positive prior candidates and refine around the lowest measured cost with geometric midpoints. Keep each trial's statistics in evaluation order.
 
 ### M1 candidate measurement
