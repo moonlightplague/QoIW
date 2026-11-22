@@ -3,15 +3,11 @@
 #include <variant>
 #include <vector>
 
-#include "qoiw/types.hpp"
+#include "qoiw/options.hpp"
 
 namespace qoiw::frontend {
 
-struct BlockSamplingOptions {
-    double sample_rate = .01;
-    // Zero selects the rank-specific default for each size.
-    std::size_t block_edge = 0, min_edge = 0, min_blocks = 0, max_blocks = 0;
-};
+using qoiw::BlockSamplingOptions;
 
 struct BlockLayout {
     std::vector<std::uint64_t> dims;   // Shape shared by all sample blocks.

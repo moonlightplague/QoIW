@@ -1,6 +1,7 @@
 #pragma once
 
 #include "frontend/resolve.hpp"
+#include "qoiw/options.hpp"
 
 namespace qoiw::frontend {
 
@@ -10,11 +11,7 @@ struct BlockSample;
 // finite and nonnegative. The correction pass checks actual reconstructions.
 double pointwise_radius(const PointTarget& target, double x, double cap);
 
-struct PriorOptions {
-    // Zero or an empty list selects the corresponding default from PLAN.md.
-    std::size_t point_samples = 0;
-    std::vector<double> quantiles;
-};
+using qoiw::PriorOptions;
 
 struct PointPrior {
     std::size_t stride;

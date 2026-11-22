@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "qoiw/types.hpp"
+
 namespace qoiw {
 
 enum class Binding { Qoi, DataBound, Tie };
@@ -60,6 +62,38 @@ struct Plan {
 
     // Missing measurements are JSON null. Infinite PSNR is "+inf" or "-inf".
     std::string to_json() const;
+};
+
+struct FieldInfo {
+    std::string name;
+    double bound = 0;
+    std::optional<double> data_bound_abs;
+    std::size_t decode_params_bytes = 0;
+    std::size_t core_bytes = 0;
+    std::size_t lossless_bytes = 0;
+};
+
+struct StreamInfo {
+    DType dtype = DType::Float32;
+    std::vector<std::uint64_t> dims;
+    std::size_t num = 0;  // Values per field.
+    std::size_t stream_bytes = 0;
+    std::string wrapper_version, core_name, core_version, core_format_version;
+    std::vector<FieldInfo> fields;
+    std::vector<TargetTolerance> targets;
+    std::optional<std::string> exact_condition;
+};
+
+struct CompressionTimes {
+    double planning = 0, core_encode = 0, core_decode = 0, correction = 0, container = 0;  // Seconds.
+};
+
+struct Report {
+    Plan plan;
+    StreamInfo stream;
+    std::size_t nonfinite_inputs = 0;
+    std::size_t restored = 0;
+    CompressionTimes seconds;
 };
 
 }  // namespace qoiw
