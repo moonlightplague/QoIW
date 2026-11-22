@@ -38,7 +38,10 @@ build/qoiw verify     -f --shape 100,500,500 -i U.f32 -o U.out.f32 -q 'x^2' -m R
 ```
 
 On Hurricane ISABEL `Uf48.bin.f32` this gives a 4.5 MB stream (ratio 22.05),
-with 308,049 values restored and every value within tolerance.
+with 308,049 values restored and every value within tolerance. Each command
+prints a sectioned report with a runtime breakdown and ends with a summary line
+of the compression ratio and total time; an annotated example is in
+[docs/cli.md](docs/cli.md#text-reports).
 
 From C++, link `QOIW::qoiw`:
 
@@ -82,6 +85,8 @@ qoiw decompress -z FILE -o FILE [-t N] [--json]
 qoiw inspect    -z FILE [--json]
 qoiw verify     (-f|-d) (--shape ... | -1 .. -4 ...) -i FILE -o FILE [targets] [-M ...] [-X PRED] [-t N] [--json]
 qoiw cores
+
+Every command also takes --color auto|always|never.
 ```
 
 `qoiw <command> --help` prints the same options.
@@ -122,6 +127,7 @@ predicate. A constant or empty range makes the fraction an absolute value.
 | `-v`, `--verbose` | `compress`: print every bound the tuner measured. |
 | `-t`, `--threads N` | Threads; default 1, `0` uses the OpenMP default. |
 | `--json` | Print a JSON report instead of text. |
+| `--color auto\|always\|never` | Style the text report. `auto` (default) colours only a terminal and honours `NO_COLOR`. |
 
 ### Exit status
 

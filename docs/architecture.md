@@ -99,7 +99,7 @@ src/
   backend/          point-wise check, lossless encode and apply
   container/        reader, writer, section constants
   pipeline/         compress, decompress, verify, request compilation
-tools/qoiw/         CLI: argument parsing, file staging, commands
+tools/qoiw/         CLI: arguments, file staging, commands (main), text reports (render, console)
 tests/              see testing.md
 bench/              benchmark scripts and case lists; runbooks in docs/benchmarks
 third_party/CLI11/  vendored CLI11 v2.7.2
