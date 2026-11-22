@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### M1 performance benchmark
+
+- Measure sequential, same-bound QoIW and plain SZ3 encode and decode pairs at one and sixteen threads. Report time budgets and compression peak RSS, with resumable measurement logs.
+
 ### M1 regret benchmark
 
 - Record the 20-case results, including zero violations, geometric mean regret of 1.04747, and the two smaller QoIW streams outside the symmetric parity band.

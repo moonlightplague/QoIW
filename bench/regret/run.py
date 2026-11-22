@@ -206,6 +206,12 @@ def measure(args, case, source, qoi_abs, data_abs, tool, fixed=None):
         })
 
 
+def resolve_tolerances(source, case):
+    report = check_files(source, source, "<f4", case.shape, [case.target("REL", case.qoi_rel)],
+                         Tolerance("REL", case.data_rel))
+    return {"qoi_abs": report["targets"][0]["tolerance_abs"], "data_abs": report["data_bound_abs"]}
+
+
 def compare_case(args, case, builds):
     source = (args.data / case.path).resolve()
     config = {
@@ -219,12 +225,7 @@ def compare_case(args, case, builds):
         "schema": 1,
     }
     with open_journal(args.results / f"{case.name}.jsonl", config) as journal:
-        def resolve():
-            report = check_files(source, source, "<f4", case.shape, [case.target("REL", case.qoi_rel)],
-                                 Tolerance("REL", case.data_rel))
-            return {"qoi_abs": report["targets"][0]["tolerance_abs"], "data_abs": report["data_bound_abs"]}
-
-        bounds = journal.measure("tolerances", resolve)
+        bounds = journal.measure("tolerances", lambda: resolve_tolerances(source, case))
         qoi_abs, data_abs = bounds["qoi_abs"], bounds["data_abs"]
         tuned = journal.measure("qoiw/tuned", lambda: measure(args, case, source, qoi_abs, data_abs, "qoiw"))
         baseline = journal.measure("qpet/tuned", lambda: measure(args, case, source, qoi_abs, data_abs, "qpet"))
