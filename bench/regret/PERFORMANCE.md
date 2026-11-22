@@ -23,7 +23,7 @@ through the same adapter. Both use the default serial full-field SZ3
 mode, which keeps payloads independent of the thread count. The thread
 setting applies to QoIW's parallel work. The first and third repetitions
 run QoIW first. The second runs plain SZ3 first at the first pair's bound.
-The two codecs in each pair must agree on the bound and core payload
+The two runs in each pair must agree on the bound and core payload
 length. Each case must retain its chosen bound and container length across
 repetitions and thread settings.
 
@@ -58,3 +58,26 @@ build revision, CPU affinity, OpenMP settings, commands, and load
 averages. Use a fresh directory when the recorded settings change or
 when measuring again under different load. Pass `--revision` when the
 probe was built from a commit other than the checkout running the harness.
+
+## Observed M1 results
+
+The run completed all 120 pairs with QoIW `1266c34`, SZ3 `28387bee`,
+GCC 13.3, and system zstd 1.5.5. The host was a shared Linux workstation
+with a 64-core AMD Ryzen Threadripper PRO 7985WX and 128 logical CPUs.
+The one-minute load average before each pair ranged from 2.14 to 3.42.
+The runner used one worker and had no exclusive reservation of the host.
+
+| Measure | Limit | 1 thread | 16 threads |
+| --- | ---: | ---: | ---: |
+| Median compression time / plain SZ3 | 3.50× | 5.32× | 2.46× |
+| Median frontend share | 35% | 46.2% | 25.2% |
+| Median decompression time / plain SZ3 | | 1.00× | 1.01× |
+| Highest case median decompression time / plain SZ3 | 1.10× | 1.74× | 1.77× |
+| Median QoIW compression peak RSS / input | | 4.14× | 4.34× |
+| Median plain SZ3 compression peak RSS / input | | 4.13× | 4.13× |
+
+The one-thread compression median remains 4.55× after subtracting the
+report's measured verification interval. The only case above the
+decompression limit was `scale-rh-tanh-3` at both thread settings. Its
+correction layer restores 24,457,211 of 141,120,000 values. Case medians
+for QoIW peak RSS ranged from 4.07× to 4.80× the input size.
