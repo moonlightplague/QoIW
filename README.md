@@ -34,6 +34,7 @@ cmake --build build --parallel
 | `QOIW_FETCH_DEPS=ON` | Fetch zstd 1.5.6 for the correction layer if system zstd is unavailable. |
 | `QOIW_BUILD_TOOLS=OFF` | Skip the `qoiw` command-line tool. |
 | `QOIW_BUILD_TESTS=OFF` | Skip the tests. |
+| `QOIW_TEST_FULL_MATRIX=ON` | Select the expanded guarantee matrix for CTest. |
 | `QOIW_WARNINGS_AS_ERRORS=ON` | Treat QoIW warnings as errors under GCC and Clang. |
 | `QOIW_SANITIZE=address`, `undefined`, or `thread` | Instrument a build with one sanitizer. The default is `none`. |
 
@@ -47,6 +48,18 @@ The common tests use known byte sequences and the CRC32C check value for
 and multi-field round trips. The SZ3 tests exercise both storage types and
 ranks 1 through 4. A stored two-chunk stream checks that OpenMP and serial
 builds reproduce the same corrected float32 values.
+
+The small guarantee matrix runs in CTest as `property.guarantees` when
+NumPy is available. It covers both storage types, ranks 1 through 4, 32
+point-wise expressions, SZ3 when enabled, and six mock cores. Each case
+compares the serial and threaded streams and checks that a decode of the
+saved container matches the bits checked by the encoder. The NumPy
+checker then reads the decoded file and checks the requested constraints.
+The scheduled Release job checks out `dev` and runs the expanded profile
+once the workflow is on the default branch. To run it locally, configure
+with `-DQOIW_TEST_FULL_MATRIX=ON` and run
+`ctest --test-dir build -R '^property.guarantees$' --output-on-failure`.
+[GitHub Actions schedule requirements](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
 
 ## Command line
 
