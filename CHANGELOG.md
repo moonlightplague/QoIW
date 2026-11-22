@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### M1 SZ3 adapter
+
+- Add built-in core lookup and the optional SZ3 adapter to the decode library. Compress float32 and float64 fields with the four planned algorithms and check the stored layout before decoding into caller-owned memory.
+
 ### M1 point-wise plan reporting
 
 - Serialize the plan and every measured trial to JSON, including the exact predicate, shortcut reason and indicative compression ratio. Check the output with an independent JSON reader.

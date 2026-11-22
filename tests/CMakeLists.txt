@@ -3,6 +3,12 @@ qoiw_configure_target(qoiw_test_byte_io)
 target_link_libraries(qoiw_test_byte_io PRIVATE QOIW::qoiw)
 add_test(NAME common.byte_io COMMAND qoiw_test_byte_io)
 
+add_executable(qoiw_test_sz3_roundtrip cores/sz3_roundtrip.cpp)
+qoiw_configure_target(qoiw_test_sz3_roundtrip)
+target_compile_definitions(qoiw_test_sz3_roundtrip PRIVATE EXPECT_SZ3=$<BOOL:${QOIW_CORE_SZ3}>)
+target_link_libraries(qoiw_test_sz3_roundtrip PRIVATE qoiw_decode)
+add_test(NAME core.sz3_roundtrip COMMAND qoiw_test_sz3_roundtrip)
+
 if(QOIW_CORE_SZ3)
     add_executable(qoiw_test_sz3_build cores/sz3_build.cpp)
     qoiw_configure_target(qoiw_test_sz3_build)
