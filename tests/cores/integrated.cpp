@@ -71,6 +71,7 @@ void round_trip(bool fixed) {
     std::vector<T> out(info.num + 1, 123);
     decompress(blob, out.data(), out.size(), 0);
     check(out.back() == 123, "decoder touched capacity past the declared field");
+    double max_data_error = 0, max_square_error = 0, max_sin_error = 0;
     for (std::size_t i = 0; i < data.size(); ++i) {
         const double x = data[i], y = out[i];
         if (!std::isfinite(x) || x > 1e30 || x == 0) {
@@ -80,8 +81,20 @@ void round_trip(bool fixed) {
                   std::abs(x * x - y * y) <= info.targets[0].tolerance_abs &&
                   std::abs(std::sin(x) - std::sin(y)) <= info.targets[1].tolerance_abs,
                   "decoded value violates a constraint");
+            max_data_error = std::max(max_data_error, std::abs(x - y));
+            max_square_error = std::max(max_square_error, std::abs(x * x - y * y));
+            max_sin_error = std::max(max_sin_error, std::abs(std::sin(x) - std::sin(y)));
         }
     }
+    const auto checked = verify(input, ArrayView(out.data(), info.dims), request, 7);
+    check(checked.ok() && checked.data.max_abs_error == max_data_error &&
+          checked.targets.at(0).errors.max_abs_error == max_square_error &&
+          checked.targets.at(1).errors.max_abs_error == max_sin_error, "verification differs from scalar checks");
+    const auto& written = report.verification;
+    check(written.ok() && written.values == checked.values && written.data_bound_abs == checked.data_bound_abs &&
+          written.data.max_abs_error == max_data_error && written.targets.at(0).errors.max_abs_error == max_square_error &&
+          written.targets.at(1).errors.max_abs_error == max_sin_error && report.seconds.verification >= 0,
+          "report should describe the corrected reconstruction");
 }
 
 void bad_arguments() {

@@ -185,6 +185,9 @@ void round_trip(BoundCase selection) {
                 ++restored;
             }
         }
+        const auto diagnostics = qoiw::backend::verify_pointwise(dtype, original.data(), raw.data(), bytes, request, 2);
+        if (diagnostics.violating_values != restored)
+            throw std::runtime_error(std::string(name) + " verification differs from scalar reference");
         Buffer serial_stream;
         for (int threads : {1, 2, 7, 16}) {
             auto verified = raw;
@@ -218,6 +221,8 @@ void round_trip(BoundCase selection) {
                                                             threads, output.data(), bytes);
             if (count != restored || std::memcmp(output.data(), verified.data(), bytes))
                 throw std::runtime_error(std::string(name) + " decode differs from verified field");
+            if (!qoiw::backend::verify_pointwise(dtype, original.data(), output.data(), bytes, request, threads).ok())
+                throw std::runtime_error(std::string(name) + " corrected decode failed verification");
         }
     }
 }

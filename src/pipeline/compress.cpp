@@ -41,7 +41,7 @@ auto call_core(Work work) {
 template <class T>
 backend::PointCorrections correct_field(const Core& core, const CoreOutput& payload, const ArrayView& input,
                                         std::size_t bytes, const ResolvedPointRequest& request, int threads,
-                                        CompressionTimes& timings) {
+                                        CompressionTimes& timings, Verification* verification) {
     auto start = Clock::now();
     std::vector<T> decoded(bytes / sizeof(T));
     call_core([&] {
@@ -51,6 +51,11 @@ backend::PointCorrections correct_field(const Core& core, const CoreOutput& payl
     start = Clock::now();
     auto corrections = backend::correct_pointwise(input.dtype, input.data, decoded.data(), bytes, request, threads);
     timings.correction = seconds_since(start);
+    if (verification) {
+        start = Clock::now();
+        *verification = backend::verify_pointwise(input.dtype, input.data, decoded.data(), bytes, request, threads);
+        timings.verification = seconds_since(start);
+    }
     return corrections;
 }
 }  // namespace
@@ -85,9 +90,10 @@ std::vector<std::uint8_t> compress(const ArrayView& input, const Request& reques
     params.bound = result.plan.bound.at(0);
     auto payload = call_core([&] { return core.compress(input.data, input.dtype, input.dims, params); });
     result.seconds.core_encode = seconds_since(start);
+    auto* verification = report ? &result.verification : nullptr;
     auto corrections = input.dtype == DType::Float32
-        ? correct_field<float>(core, payload, input, bytes, resolved, params.threads, result.seconds)
-        : correct_field<double>(core, payload, input, bytes, resolved, params.threads, result.seconds);
+        ? correct_field<float>(core, payload, input, bytes, resolved, params.threads, result.seconds, verification)
+        : correct_field<double>(core, payload, input, bytes, resolved, params.threads, result.seconds, verification);
     result.restored = corrections.restored;
 
     start = Clock::now();

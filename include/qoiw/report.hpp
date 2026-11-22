@@ -109,6 +109,7 @@ struct StreamInfo {
 
 struct CompressionTimes {
     double planning = 0, core_encode = 0, core_decode = 0, correction = 0, container = 0;  // Seconds.
+    double verification = 0;
 };
 
 struct Report {
@@ -117,6 +118,7 @@ struct Report {
     std::size_t nonfinite_inputs = 0;
     std::size_t restored = 0;
     CompressionTimes seconds;
+    Verification verification;  // On the corrected reconstruction.
 };
 
 }  // namespace qoiw

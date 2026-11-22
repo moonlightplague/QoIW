@@ -83,9 +83,31 @@ The M1 request defaults to `Tol::none()` for the data bound. Use
 `Tol::abs(...)` or `Tol::rel(...)` to set an explicit constraint. Set
 `options.fixed_bound` to bypass tuning and retain the requested checks.
 The optional compression report records the plan, stored metadata and
-sizes, the number of restored values, and elapsed seconds for each stage.
+sizes, the number of restored values, the errors after correction, and
+elapsed seconds for each stage.
 Catch `qoiw::Error` and use `code()` to distinguish failures such as an
 undersized output, an unavailable core, or a corrupt stream.
+
+## Verify two fields
+
+Call `qoiw::verify(original, reconstructed, request, threads)` with two
+array views of the same shape and storage type. It resolves relative
+tolerances from the original field and runs without a compressor. The
+returned `Verification` includes the absolute tolerances, per-constraint
+counts, and maximum absolute errors. `ok()` is true when no value violates
+any constraint.
+
+The overall count includes each failing position once. A changed non-finite
+storage value counts under data even with the data bound disabled. If both
+storage values are finite, a changed pair that makes either QoI evaluation
+non-finite counts under that target. A changed finite pair counts under
+`exact_violations` if either value satisfies the exact predicate. Bit-identical
+values pass every check. Maximum errors use pairs with finite operands. A
+difference that overflows is reported as infinity.
+
+When a compression report is requested, its `verification` field measures
+the corrected reconstruction with the same resolved tolerances used by the
+encoder. This additional pass is timed in `seconds.verification`.
 
 ## SZ3 core
 

@@ -4,6 +4,7 @@
 
 ### M1 point-wise verification
 
+- Include verification of the corrected reconstruction in compression reports and check the diagnostics against independent scalar expectations across SZ3 and all six mock cores.
 - Add a read-only C++ verifier for matching float32 or float64 fields. Report resolved tolerances, maximum errors, and per-constraint and distinct-value violation counts.
 
 ### M1 integrated C++ API
