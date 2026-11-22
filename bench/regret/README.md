@@ -70,3 +70,15 @@ symmetric per-case gate failed for two smaller QoIW streams.
 At the same bound, both tools produced the same SZ3 payload sizes in these
 two cases and both decoded fields passed the independent check. The
 remaining 40-byte differences are in the containers and correction layers.
+
+The oracle compared 539 QoIW streams, including the tuned choices and 519
+additional fixed-bound trials. Every decoded field passed the independent
+check. The geometric mean regret was 1.04747, below the M1 gate of 1.07.
+Four cases had regret above 1.05.
+
+| Case | Tuned bytes | Oracle bytes | Regret |
+| --- | ---: | ---: | ---: |
+| `cesm-precsc-x3` | 20,079 | 13,194 | 1.52183 |
+| `cesm-cldhgh-x2` | 2,025,876 | 1,738,065 | 1.16559 |
+| `cesm-fsnsc-x3` | 144,104 | 128,359 | 1.12266 |
+| `hur-qcloud-x2` | 923,354 | 850,325 | 1.08588 |

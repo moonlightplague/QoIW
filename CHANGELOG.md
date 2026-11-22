@@ -4,6 +4,7 @@
 
 ### M1 regret benchmark
 
+- Record the 20-case results, including zero violations, geometric mean regret of 1.04747, and the two smaller QoIW streams outside the symmetric parity band.
 - Test oracle refinement, gate thresholds, and journal recovery and reuse. Document how to reproduce the comparison.
 - Measure tuned QoIW and QPET streams and refine a full-field QoIW oracle. Independently check each decode and resume measured bounds from per-case journals.
 - Record the 20 reference cases and add a benchmark-only helper that reads the smallest positive F1 radius and the data cap for the oracle sweep.
