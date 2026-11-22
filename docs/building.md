@@ -10,7 +10,7 @@ lists every option and explains the less common builds.
 | CMake | 3.19 or newer | | SZ3's own minimum |
 | C++ compiler | C++17 | | GCC or Clang for the warning and sanitizer options |
 | zstd | 1.4 or newer | `find_package(zstd CONFIG)`, then pkg-config `libzstd` | Used by the LOSSLESS layer in every build. `QOIW_FETCH_DEPS=ON` fetches v1.5.6 instead. |
-| SZ3 | 3.4 | the `SZ3/` submodule by default | Header-only. Not needed with `QOIW_CORE_SZ3=OFF`. |
+| SZ3 | 3.4 | the `SZ3/` submodule | Header-only. |
 | OpenMP | any | `find_package(OpenMP COMPONENTS CXX)`, optional | Parallel encoder passes. |
 | Python 3 with NumPy | | `find_package(Python3)`, optional | Registers the Python-driven tests. Tests that need NumPy skip without it. |
 | CLI11 | v2.7.2 | vendored in `third_party/CLI11` | CLI only. |
@@ -19,14 +19,11 @@ lists every option and explains the less common builds.
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| `QOIW_CORE_SZ3` | `ON` | Build the SZ3 adapter and register core `sz3`. With `OFF`, `available_cores()` is empty and the public `compress` reports `Unsupported`; the tests reach the pipeline with mock cores. |
-| `QOIW_SZ3_SOURCE_DIR` | empty | Use another SZ3 checkout instead of `./SZ3`. |
-| `QOIW_SZ3_USE_INSTALLED` | `OFF` | Use `find_package(SZ3 3.4 CONFIG)`. Set `CMAKE_PREFIX_PATH` for a custom prefix. |
 | `QOIW_FETCH_DEPS` | `OFF` | Fetch zstd v1.5.6 when no system zstd is found. |
 | `QOIW_BUILD_TOOLS` | `ON` | Build the `qoiw` executable. |
 | `QOIW_BUILD_TESTS` | `ON` | Build and register the tests. |
 | `QOIW_TEST_FULL_MATRIX` | `OFF` | Register the expanded guarantee matrix instead of the small one (only when Python is found). |
-| `QOIW_BUILD_BENCHMARKS` | `OFF` | Build `qoiw_regret_prior` and, on Linux with SZ3 and OpenMP, `qoiw_performance_probe`. |
+| `QOIW_BUILD_BENCHMARKS` | `OFF` | Build `qoiw_regret_prior` and, on Linux with OpenMP, `qoiw_performance_probe`. |
 | `QOIW_WARNINGS_AS_ERRORS` | `OFF` | Add `-Werror` to QoIW targets. |
 | `QOIW_SANITIZE` | `none` | `address`, `undefined` or `thread` for QoIW targets. |
 
@@ -86,5 +83,5 @@ target_link_libraries(writer PRIVATE QOIW::qoiw)   # compress, verify, Expr
 target_link_libraries(reader PRIVATE qoiw_decode)  # inspect, decompress only
 ```
 
-`qoiw_decode` carries the SZ3 adapter and zstd but no expression engine or
-frontend.
+`qoiw_decode` carries all built-in adapters and zstd. The writer also links
+the expression engine and frontend.

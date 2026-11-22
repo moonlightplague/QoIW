@@ -115,18 +115,12 @@ assert "SUBCOMMANDS" in cli("--help")
 verify_help = cli("verify", "--help")
 assert "qoiw verify" in verify_help and "--reconstructed" in verify_help
 cli("unknown", "--help", status=1)
-golden = Path(sys.argv[3])
+golden = Path(sys.argv[2])
 assert read_json("inspect", "-z", golden)["shape"] == [16, 32]
 with tempfile.TemporaryDirectory(prefix="qoiw-cli-") as directory:
     root = Path(directory)
     malformed_inputs(root)
-    if sys.argv[2] == "1":
-        assert "sz3 version=" in cli("cores")
-        round_trip_f32(root)
-        round_trip_f64(root)
-    else:
-        assert not cli("cores")
-        unavailable_output = root / "unavailable.f32"
-        cli("decompress", "-z", golden, "-o", unavailable_output, status=1)
-        assert not unavailable_output.exists()
+    assert "sz3 version=" in cli("cores")
+    round_trip_f32(root)
+    round_trip_f64(root)
     assert not list(root.glob(".qoiw-*"))

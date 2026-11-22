@@ -1,0 +1,10 @@
+#pragma once
+
+@adapter_includes@
+namespace qoiw::detail {
+
+using CoreFactory = const Core& (*)();
+inline constexpr CoreFactory builtin_cores[] = {
+@adapter_factories@};
+
+}  // namespace qoiw::detail

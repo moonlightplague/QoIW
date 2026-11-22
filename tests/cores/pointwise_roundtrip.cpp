@@ -135,8 +135,8 @@ void round_trip(BoundCase selection) {
     // With one sample, F1 sees only the negative value at index zero.
     const PriorOptions options{selection == BoundCase::ZeroSample ? 1u : 0u, {}};
 
-    auto names = qoiw::available_cores();
-    names.insert(names.end(), {"mock:identity", "mock:quantizer", "mock:noise", "mock:garbage", "mock:signflip", "mock:nan"});
+    const std::string_view names[]{"sz3", "mock:identity", "mock:quantizer", "mock:noise",
+                                  "mock:garbage", "mock:signflip", "mock:nan"};
     auto lookup = [](std::string_view name) -> const qoiw::Core& {
         return name.substr(0, 5) == "mock:" ? qoiw::test::mock_core(name) : qoiw::get_core(name);
     };

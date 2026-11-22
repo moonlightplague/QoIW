@@ -53,8 +53,9 @@ cells, special-value handling) are not implemented.
 ### Registry
 
 `get_core(name)` and `available_cores()` (`src/core/builtin.cpp`) return the
-built-in cores compiled into `qoiw_decode`: `sz3` when `QOIW_CORE_SZ3=ON`.
-There is no run-time registration or plugin loading yet.
+built-in cores compiled into `qoiw_decode`. CMake generates the factory list
+from `QOIW_CORE_SOURCES`. The registry uses each adapter's `name()` as its
+key, so each name must be unique and stable. SZ3 is included in every build.
 
 ## SZ3
 
@@ -89,13 +90,9 @@ depend on the core.
 
 ## Adding a core
 
-1. Write `src/core/adapters/<name>.cpp` implementing `Core`, including only
-   that compressor's headers (compressor headers do not always coexist in one
-   translation unit).
-2. Return accurate traits; when unsure, keep `NominalAbs`.
-3. Add it to `qoiw_decode` in `CMakeLists.txt` behind an option, and to
-   `get_core` and `available_cores` in `src/core/builtin.cpp`.
-4. Add a round-trip test like `tests/cores/sz3_roundtrip.cpp` and enable it
-   in the guarantee matrix (`tests/property/`).
-
-Never modify the compressor's source; adapt to its public API.
+Follow the [README steps](../README.md#add-your-own-core). Keep the
+compressor's public headers in the adapter's `.cpp`, since headers from
+different compressors can conflict in one translation unit. Use
+`NominalAbs` if the compressor's bound is approximate. The
+[SZ3 round-trip test](../tests/cores/sz3_roundtrip.cpp) shows how to check
+the adapter across supported shapes, storage types and thread counts.

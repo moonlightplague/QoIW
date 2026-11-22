@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Core integration
+
+- Generate the built-in core registry from the CMake adapter source list. An adapter supplies a matching header and factory.
+- Build the pinned SZ3 adapter by default in every build and select the core through the CLI or C++ options. Document how to add an adapter.
+
 ### Technical documentation
 
 - Add `docs/` with pages on the architecture, building, the C++ API, CLI reports, expressions, the frontend (F0 to F6), the backend and LOSSLESS layer, the container format, cores, and testing, written against the current code and listing what the plan has not implemented yet.
