@@ -6,13 +6,16 @@
 
 namespace qoiw::frontend {
 
-struct CandidateMeasurement {
+struct CandidateStats {
     double bound = 0;
     std::size_t sample_values = 0, restored = 0;
     std::size_t core_bytes = 0, overhead_bytes = 0, lossless_bytes = 0;
     double input_sensitive_share = 0, sample_sensitive_share = 0, correction_weight = 1;
     bool rare_outlier_fallback = false;
     double correction_bytes_per_value = 0, bytes_per_value = 0;
+};
+
+struct CandidateMeasurement : CandidateStats {
     SampleBlocks decoded;  // Raw core reconstruction, before any correction.
 };
 

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### M1 point-wise bound search
+
+- Measure distinct positive prior candidates and refine around the lowest measured cost with geometric midpoints. Keep each trial's statistics in evaluation order.
+
 ### M1 candidate measurement
 
 - Compare F4's raw decodes, correction counts, and payload sizes with independent scalar checks across all six mock cores and both storage types. Document the cost calculation.
