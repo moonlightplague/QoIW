@@ -23,7 +23,9 @@ through the same adapter. Both use the default serial full-field SZ3
 mode, which keeps payloads independent of the thread count. The thread
 setting applies to QoIW's parallel work. The first and third repetitions
 run QoIW first. The second runs plain SZ3 first at the first pair's bound.
-All pairs must agree on the bound and core payload length.
+The two codecs in each pair must agree on the bound and core payload
+length. Each case must retain its chosen bound and container length across
+repetitions and thread settings.
 
 The probe times the in-memory compression and decompression calls. It
 reads the input before timing and allocates the public decode output
@@ -33,18 +35,21 @@ the planning and verification intervals separately. Decode includes
 parsing the container and applying the lossless corrections. The
 fingerprint and advisor become measurable when M3 and M2 add them.
 
-The probe records Linux peak resident memory just after compression,
-before allocating the output buffer for the public decode. This includes
-the input and process overhead. It reflects resident pages, which can
-differ from the total capacity allocated by the codec.
+The probe reads its Linux `VmHWM` just after compression, before allocating
+the output buffer for the public decode. This measures peak resident
+memory in the probe's address space, including the input and process
+overhead. Resident pages can differ from the total capacity allocated
+by the codec.
 
-The summary takes the median of the three paired ratios for each case,
-then takes the median across cases for each thread setting. The limits
-are 3.5 for compression time relative to plain SZ3, 35% for frontend
-time as a share of QoIW compression, and 1.1 for decompression time
-relative to plain SZ3. Status 0 means every reported budget passed.
-Status 2 means a completed run exceeded at least one budget. Status 1
-means the run failed to complete.
+The summary takes the median of the three paired ratios for each case
+and thread setting. The corpus median must be at most 3.5 for compression
+time relative to plain SZ3 and 35% for frontend time as a share of QoIW
+compression. The decompression limit is 1.1 times plain SZ3 and applies
+to each case median, since §15.1 specifies a median for the first two
+budgets. The summary includes the corpus median, the largest case
+median, and cases over each limit. Status 0 means every reported budget
+passed. Status 2 means a completed run exceeded at least one budget.
+Status 1 means the run failed to complete.
 
 `--case` selects cases by name for shorter runs. Results from a subset
 apply to that subset. Rerun with the same command to resume from

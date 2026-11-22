@@ -34,10 +34,17 @@ def medians(rows, keys):
 def budgets(cases):
     results = {}
     for threads in THREADS:
-        measurements = [case["threads"][threads]["medians"] for case in cases]
-        values = medians(measurements, LIMITS)
-        results[threads] = {key: {"median": value, "limit": LIMITS[key], "pass": value <= LIMITS[key]}
-                            for key, value in values.items()}
+        groups = {}
+        for key, limit in LIMITS.items():
+            values = {case["case"]: case["threads"][threads]["medians"][key] for case in cases}
+            worst = max(values, key=values.__getitem__)
+            gate = {
+                "corpus_median": median(values.values()), "max_case_median": values[worst], "worst_case": worst,
+                "cases_over_limit": [name for name, value in values.items() if value > limit], "limit": limit,
+            }
+            statistic = "max_case_median" if key == "decompression_ratio" else "corpus_median"
+            groups[key] = {**gate, "statistic": statistic, "pass": gate[statistic] <= limit}
+        results[threads] = groups
     return results
 
 

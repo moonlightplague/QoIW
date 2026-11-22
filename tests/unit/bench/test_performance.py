@@ -31,15 +31,19 @@ class PerformanceTests(unittest.TestCase):
                                 "decompression_ratio": decompression}}
 
         results = budgets([
-            {"threads": {1: group(7, .1, 1.1), 16: group(3, .36, 1.2)}},
-            {"threads": {1: group(3.5, .35, .9), 16: group(1, .35, 1.2)}},
-            {"threads": {1: group(2, .9, 1.1), 16: group(1, .4, .8)}},
+            {"case": "a", "threads": {1: group(7, .1, 1.1), 16: group(3, .36, 1.2)}},
+            {"case": "b", "threads": {1: group(3.5, .35, .9), 16: group(1, .35, 1.1)}},
+            {"case": "c", "threads": {1: group(2, .9, 1.1), 16: group(1, .4, .8)}},
         ])
-        self.assertEqual(results[1]["compression_ratio"], {"median": 3.5, "limit": 3.5, "pass": True})
+        self.assertEqual(results[1]["compression_ratio"]["corpus_median"], 3.5)
+        self.assertEqual(results[1]["compression_ratio"]["cases_over_limit"], ["a"])
+        self.assertTrue(results[1]["compression_ratio"]["pass"])
         self.assertTrue(results[1]["frontend_share"]["pass"])
         self.assertTrue(results[1]["decompression_ratio"]["pass"])
         self.assertTrue(results[16]["compression_ratio"]["pass"])
         self.assertFalse(results[16]["frontend_share"]["pass"])
+        self.assertEqual(results[16]["decompression_ratio"]["corpus_median"], 1.1)
+        self.assertEqual(results[16]["decompression_ratio"]["worst_case"], "a")
         self.assertFalse(results[16]["decompression_ratio"]["pass"])
 
     def test_baseline_can_run_first_at_the_saved_bound(self):

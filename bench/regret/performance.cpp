@@ -1,9 +1,10 @@
 #include <chrono>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <string>
 #include <string_view>
-#include <sys/resource.h>
 
 #include "common/shape.hpp"
 #include "files.hpp"
@@ -19,9 +20,15 @@ double elapsed(Clock::time_point start) {
 }
 
 long peak_rss_kib() {
-    rusage usage{};
-    if (getrusage(RUSAGE_SELF, &usage) != 0) throw std::runtime_error("cannot read peak RSS");
-    return usage.ru_maxrss;
+    // Linux rusage can carry a larger peak forward from before exec.
+    // VmHWM covers the address space used by this probe.
+    std::ifstream status("/proc/self/status");
+    constexpr std::string_view field = "VmHWM:";
+    std::string line;
+    while (std::getline(status, line)) {
+        if (line.compare(0, field.size(), field) == 0) return std::stol(line.substr(field.size()));
+    }
+    throw std::runtime_error("cannot read VmHWM from /proc/self/status");
 }
 
 void wrapped(const ArrayView& input, std::size_t count, int threads, const Request& request) {
