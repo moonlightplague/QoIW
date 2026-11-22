@@ -34,7 +34,7 @@ cmake --build build --parallel
 | `QOIW_FETCH_DEPS=ON` | Fetch zstd 1.5.6 for the correction layer if system zstd is unavailable. |
 | `QOIW_BUILD_TOOLS=OFF` | Skip the `qoiw` command-line tool. |
 | `QOIW_BUILD_TESTS=OFF` | Skip the tests. |
-| `QOIW_BUILD_BENCHMARKS=ON` | Build the F1 helper for the regret benchmark. |
+| `QOIW_BUILD_BENCHMARKS=ON` | Build the regret and performance benchmark helpers. |
 | `QOIW_TEST_FULL_MATRIX=ON` | Select the expanded guarantee matrix for CTest. |
 | `QOIW_WARNINGS_AS_ERRORS=ON` | Treat QoIW warnings as errors under GCC and Clang. |
 | `QOIW_SANITIZE=address`, `undefined`, or `thread` | Instrument a build with one sanitizer. The default is `none`. |
@@ -419,3 +419,6 @@ Hurricane result, and the field inventory for parity testing. [Reference baselin
 
 The M1 harness measures SZ3 tuning regret and compares QoIW with pinned
 QPET across the 20 reference cases. [Regret benchmark](bench/regret/README.md)
+
+The performance run measures the same cases against plain SZ3 at identical
+bounds. [M1 timing and memory](bench/regret/PERFORMANCE.md)

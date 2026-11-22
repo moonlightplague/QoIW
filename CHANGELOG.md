@@ -4,6 +4,7 @@
 
 ### M1 performance benchmark
 
+- Document the measurement protocol and test paired timing ratios, baseline ordering, and budget thresholds.
 - Measure sequential, same-bound QoIW and plain SZ3 encode and decode pairs at one and sixteen threads. Report time budgets and compression peak RSS, with resumable measurement logs.
 
 ### M1 regret benchmark
