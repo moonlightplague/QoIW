@@ -20,7 +20,7 @@ reported as skipped when it is missing.
 | `backend.lossless`, `backend.pointwise` | `unit/backend/` | Layer encoding and every validation failure; the check rules of [backend](backend.md#checks). |
 | `frontend.resolve`, `.prior`, `.prepare`, `.sample`, `.measure`, `.search`, `.plan`, `.plan_json` | `unit/frontend/` | F0 to F6 on synthetic inputs, including QPET's Hurricane block layout and JSON output. |
 | `core.mock_roundtrip` | `cores/mock_roundtrip.cpp` | Mock cores, the quantizer golden stream, the LOSSLESS golden stream. |
-| `core.pointwise_roundtrip` | `cores/pointwise_roundtrip.cpp` | Encoder and decoder see the same bits after correction, for every mock core. |
+| `core.pointwise_roundtrip` | `cores/pointwise_roundtrip.cpp` | Encoder and decoder see the same bits after correction for SZ3 and every mock core. |
 | `core.sz3_roundtrip`, `core.sz3_build` | `cores/sz3_*.cpp` | Both types, ranks 1 to 4, options, chunked streams with 1, 2 and 7 threads, the chunked golden stream; that SZ3's headers, generated configuration and zstd linkage work on their own. |
 | `pipeline.integrated`, `pipeline.verify` | `cores/integrated.cpp`, `cores/verify.cpp` | Public `compress`, `decompress`, `inspect`, `verify`, error codes, reports. |
 | `property.guarantees` | `property/guarantees.py`, `property/roundtrip.cpp` | The guarantee matrix below. |
@@ -38,8 +38,8 @@ the saved container and requires the bits the encoder checked, and writes the
 decoded file. The driver checks that file with the NumPy checker against the
 request and compares the tolerances stored in the container with its own.
 
-Cases cross both storage types, the enabled cores (SZ3 and the six mock
-cores), nine field families (smooth, noisy, sparse with zeros, heavy-tailed,
+Cases cross both storage types, SZ3 and the six mock
+cores, nine field families (smooth, noisy, sparse with zeros, heavy-tailed,
 constant, non-finite, `1e36` fills, denormals, threshold-crowded) in ranks 1
 to 4, and 32 point-wise expressions in eight groups (smooth, oscillating,
 singular, other functions, piecewise, steps, comparisons, curved). The small
@@ -70,11 +70,11 @@ assert report["ok"], report
 `.github/workflows/build.yml` runs on pushes and pull requests to `dev` and
 `main`, and nightly against `dev`, on Ubuntu 24.04 with NumPy installed:
 
-| Compiler | Build | Sanitizer | SZ3 |
-| --- | --- | --- | --- |
-| g++ | Release | none (nightly: full matrix) | on |
-| clang++ | Debug | address | on |
-| clang++ | Debug | undefined | off |
-| clang++-18 | Debug | thread, with LLVM Archer | on |
+| Compiler | Build | Sanitizer |
+| --- | --- | --- |
+| g++ | Release | none (nightly: full matrix) |
+| clang++ | Debug | address |
+| clang++ | Debug | undefined |
+| clang++-18 | Debug | thread, with LLVM Archer |
 
 All jobs build with `-DQOIW_WARNINGS_AS_ERRORS=ON`.

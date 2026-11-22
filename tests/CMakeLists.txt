@@ -18,21 +18,18 @@ set_tests_properties(pipeline.verify PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=4")
 find_package(Threads REQUIRED)
 add_executable(qoiw_test_sz3_roundtrip cores/sz3_roundtrip.cpp)
 qoiw_configure_target(qoiw_test_sz3_roundtrip)
-target_compile_definitions(qoiw_test_sz3_roundtrip PRIVATE EXPECT_SZ3=$<BOOL:${QOIW_CORE_SZ3}>
-    QOIW_SZ3_GOLDEN="${CMAKE_CURRENT_SOURCE_DIR}/golden/m1-sz3-chunked.qoiw")
 target_link_libraries(qoiw_test_sz3_roundtrip PRIVATE qoiw_decode Threads::Threads)
-if(QOIW_CORE_SZ3 AND OpenMP_CXX_FOUND)
+if(OpenMP_CXX_FOUND)
     target_link_libraries(qoiw_test_sz3_roundtrip PRIVATE OpenMP::OpenMP_CXX)
 endif()
-add_test(NAME core.sz3_roundtrip COMMAND qoiw_test_sz3_roundtrip)
+add_test(NAME core.sz3_roundtrip COMMAND qoiw_test_sz3_roundtrip
+    "${CMAKE_CURRENT_SOURCE_DIR}/golden/m1-sz3-chunked.qoiw")
 set_tests_properties(core.sz3_roundtrip PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=4;OMP_DYNAMIC=FALSE;OMP_THREAD_LIMIT=8")
 
-if(QOIW_CORE_SZ3)
-    add_executable(qoiw_test_sz3_build cores/sz3_build.cpp)
-    qoiw_configure_target(qoiw_test_sz3_build)
-    target_link_libraries(qoiw_test_sz3_build PRIVATE SZ3::SZ3)
-    add_test(NAME core.sz3_build COMMAND qoiw_test_sz3_build)
-endif()
+add_executable(qoiw_test_sz3_build cores/sz3_build.cpp)
+qoiw_configure_target(qoiw_test_sz3_build)
+target_link_libraries(qoiw_test_sz3_build PRIVATE SZ3::SZ3)
+add_test(NAME core.sz3_build COMMAND qoiw_test_sz3_build)
 
 foreach(part reader writer)
     add_executable(qoiw_test_container_${part} unit/container/${part}.cpp)
@@ -137,7 +134,7 @@ if(Python3_Interpreter_FOUND)
         set(matrix_profile full)
     endif()
     add_test(NAME property.guarantees COMMAND Python3::Interpreter -B "${CMAKE_CURRENT_SOURCE_DIR}/property/guarantees.py"
-        $<TARGET_FILE:qoiw_matrix_probe> --sz3 $<BOOL:${QOIW_CORE_SZ3}> --profile ${matrix_profile})
+        $<TARGET_FILE:qoiw_matrix_probe> --profile ${matrix_profile})
     set_tests_properties(property.guarantees PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "OMP_DYNAMIC=FALSE")
     add_test(NAME reference.numpy COMMAND Python3::Interpreter -B
         "${CMAKE_CURRENT_SOURCE_DIR}/reference/test_qoi_numpy.py")
@@ -146,13 +143,11 @@ if(Python3_Interpreter_FOUND)
         "${CMAKE_CURRENT_SOURCE_DIR}/unit/frontend/plan_json.py" $<TARGET_FILE:qoiw_test_plan>)
     if(QOIW_BUILD_TOOLS)
         add_test(NAME cli.pointwise COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/cli/pointwise.py"
-            $<TARGET_FILE:qoiw_cli> $<BOOL:${QOIW_CORE_SZ3}> "${CMAKE_CURRENT_SOURCE_DIR}/golden/m1-sz3-chunked.qoiw")
+            $<TARGET_FILE:qoiw_cli> "${CMAKE_CURRENT_SOURCE_DIR}/golden/m1-sz3-chunked.qoiw")
         set_tests_properties(cli.pointwise PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=4;OMP_DYNAMIC=FALSE")
-        if(QOIW_CORE_SZ3)
-            add_test(NAME reference.numpy_cli COMMAND Python3::Interpreter -B
-                "${CMAKE_CURRENT_SOURCE_DIR}/reference/check_cli.py" $<TARGET_FILE:qoiw_cli>)
-            set_tests_properties(reference.numpy_cli PROPERTIES SKIP_RETURN_CODE 77
-                ENVIRONMENT "OMP_NUM_THREADS=4;OMP_DYNAMIC=FALSE")
-        endif()
+        add_test(NAME reference.numpy_cli COMMAND Python3::Interpreter -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/reference/check_cli.py" $<TARGET_FILE:qoiw_cli>)
+        set_tests_properties(reference.numpy_cli PROPERTIES SKIP_RETURN_CODE 77
+            ENVIRONMENT "OMP_NUM_THREADS=4;OMP_DYNAMIC=FALSE")
     endif()
 endif()

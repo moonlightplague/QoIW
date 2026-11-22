@@ -149,10 +149,10 @@ void thread_modes(const Core& core) {
 #endif
 }
 
-void chunked_golden(bool sz3_enabled) {
+void chunked_golden(const char* path) {
     // SZ3 3.4.0, algo=nopred, two chunks. Each original is an integer plus
     // (0, .125), so a step of .25 reconstructs that integer before correction.
-    std::ifstream file(QOIW_SZ3_GOLDEN, std::ios::binary);
+    std::ifstream file(path, std::ios::binary);
     check(file.good(), "missing SZ3 golden stream");
     const Buffer blob{std::istreambuf_iterator<char>(file), {}};
     const auto stream = inspect(blob);
@@ -168,15 +168,6 @@ void chunked_golden(bool sz3_enabled) {
         const double x = bucket + (1 + ((state >> 9) % 127)) / 1024.;
         y = static_cast<float>(std::abs(x * x - bucket * bucket) > 1 ? x : bucket);
     }
-    if (!sz3_enabled) {
-        try {
-            decompress(blob, out.data(), out.size());
-        } catch (const Error& error) {
-            if (error.code() == ErrorCode::Unsupported) return;
-            throw;
-        }
-        throw std::runtime_error("decoded SZ3 stream in a build without SZ3");
-    }
     for (int threads : {1, 2, 7}) {
         std::fill(out.begin(), out.end(), 17);
         const auto bytes = out.size() * sizeof(float);
@@ -186,18 +177,15 @@ void chunked_golden(bool sz3_enabled) {
 }
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
     try {
+        check(argc == 2, "expected path to SZ3 golden stream");
         rejects([] { get_core("unknown"); });
-        chunked_golden(EXPECT_SZ3);
-        if (!EXPECT_SZ3) {
-            rejects([] { get_core("sz3"); });
-            check(available_cores().empty(), "SZ3 listed in disabled build");
-            return 0;
-        }
+        chunked_golden(argv[1]);
         const auto& core = get_core("sz3");
-        check(available_cores() == std::vector<std::string>{"sz3"} && core.name() == "sz3" &&
-              !core.version().empty() && !core.format_version().empty(), "unexpected built-in cores or version");
+        const auto names = available_cores();
+        check(std::find(names.begin(), names.end(), "sz3") != names.end() && core.name() == "sz3" &&
+              !core.version().empty() && !core.format_version().empty(), "missing SZ3 registration or version");
         auto traits = core.traits(DType::Float32, 3);
         check(traits.bound_kind == BoundKind::StrictAbs && traits.thread_safe && !traits.fixed_call_overhead,
               "unexpected SZ3 traits");

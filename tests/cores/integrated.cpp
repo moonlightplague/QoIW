@@ -6,7 +6,7 @@
 #include <iostream>
 #include <limits>
 
-#include "qoiw/core.hpp"
+#include "container/container.hpp"
 
 namespace {
 using namespace qoiw;
@@ -105,11 +105,6 @@ void bad_arguments() {
     rejects(ErrorCode::Unsupported, [&] { compress(input, {}, options); });
     rejects(ErrorCode::InvalidArgument, [&] { compress(ArrayView(data, {0})); });
     rejects(ErrorCode::CorruptStream, [] { inspect({}); });
-    if (available_cores().empty()) {
-        rejects(ErrorCode::Unsupported, [&] { compress(input); });
-        return;
-    }
-
     options.core = "sz3";
     options.fixed_bound = 0;
     Report report;
@@ -136,6 +131,11 @@ void bad_arguments() {
     rejects(ErrorCode::InvalidArgument, [&] { decompress(blob, out, 3); });
     rejects(ErrorCode::InvalidArgument, [&] { decompress(blob, out, 4, -1); });
     rejects(ErrorCode::CorruptStream, [&] { decompress({blob.data(), blob.size() - 1}, out, 4); });
+    auto unavailable = container::read(blob);
+    unavailable.core_name = "unavailable";
+    const auto unavailable_blob = container::write(unavailable);
+    check(inspect(unavailable_blob).core_name == "unavailable", "inspect should work without a matching core");
+    rejects(ErrorCode::Unsupported, [&] { decompress(unavailable_blob, out, 4); });
     check(std::equal(data, data + 4, out) && wrong_type[0] == 0, "validation wrote to a rejected output");
 }
 }  // namespace
@@ -143,10 +143,8 @@ void bad_arguments() {
 int main() {
     try {
         bad_arguments();
-        if (!available_cores().empty()) {
-            round_trip<float>(true);
-            round_trip<double>(false);
-        }
+        round_trip<float>(true);
+        round_trip<double>(false);
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;
