@@ -83,3 +83,8 @@ add_executable(qoiw_test_measure unit/frontend/measure.cpp)
 qoiw_configure_target(qoiw_test_measure)
 target_link_libraries(qoiw_test_measure PRIVATE qoiw_mock_cores QOIW::qoiw Threads::Threads)
 add_test(NAME frontend.measure COMMAND qoiw_test_measure)
+
+add_executable(qoiw_test_search unit/frontend/search.cpp)
+qoiw_configure_target(qoiw_test_search)
+target_link_libraries(qoiw_test_search PRIVATE QOIW::qoiw)
+add_test(NAME frontend.search COMMAND qoiw_test_search)

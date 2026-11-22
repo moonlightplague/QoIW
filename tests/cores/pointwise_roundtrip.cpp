@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -7,7 +8,7 @@
 #include "backend/lossless.hpp"
 #include "backend/pointwise.hpp"
 #include "core/adapters/mock.hpp"
-#include "frontend/measure.hpp"
+#include "frontend/search.hpp"
 #include "pipeline/decode_field.hpp"
 
 namespace {
@@ -32,8 +33,21 @@ bool may_keep(const T& original, const T& candidate) {
 
 enum class BoundCase { Candidates, Fixed, ZeroSample };
 
+void affine_shortcut() {
+    using namespace qoiw::frontend;
+    const auto& core = qoiw::test::mock_core("mock:quantizer");
+    const double field[]{-1, 1};
+    const PointRequest spec{{{Expr("2*x"), {Tolerance::Mode::Absolute, .25}}}, {}, {}};
+    const auto prep = prepare_pointwise(DType::Float64, field, sizeof(field), {2}, spec,
+                                        core.traits(DType::Float64, 1), 1);
+    const auto selected = select_pointwise_bound(core, prep);
+    if (selected.bound != .125 || !selected.trace.empty())
+        throw std::runtime_error("affine shortcut should bypass search");
+}
+
 template <class T>
-void check_trials(const qoiw::Core& core, const qoiw::frontend::PointPreparation& prep, qoiw::CoreParams params) {
+void check_trials(const qoiw::Core& core, const qoiw::frontend::PointPreparation& prep,
+                  const qoiw::frontend::BoundSelection& selection, qoiw::CoreParams params) {
     using namespace qoiw::frontend;
     const auto& search = std::get<PointSearch>(prep.decision);
     const auto& blocks = std::get<std::vector<std::vector<T>>>(search.sample.blocks);
@@ -42,10 +56,19 @@ void check_trials(const qoiw::Core& core, const qoiw::frontend::PointPreparation
     params.threads = 4;
     PointMeasurer meter(core, prep.resolved, search, params);
     params.threads = 1;
-    for (const double bound : search.prior.candidates) {
-        const auto& trial = meter.measure(bound);
+    auto traced = [&](double bound) {
+        return std::any_of(selection.trace.begin(), selection.trace.end(),
+                           [=](const CandidateStats& s) { return s.bound == bound; });
+    };
+    for (double seed : search.prior.candidates) {
+        if (!traced(seed)) throw std::runtime_error("unmeasured prior candidate");
+    }
+    if (!traced(selection.bound) || !traced(*prep.resolved.request.data_bound_abs))
+        throw std::runtime_error("chosen bound or data-bound probe missing from trace");
+    for (const auto& stats : selection.trace) {
+        const auto& trial = meter.measure(stats.bound);
         const auto& cached = std::get<std::vector<std::vector<T>>>(trial.decoded);
-        params.bound = bound;
+        params.bound = stats.bound;
         std::size_t core_bytes = 0, lossless_bytes = 0, restored = 0;
         for (std::size_t k = 0; k < blocks.size(); ++k) {
             const auto& block = blocks[k];
@@ -63,7 +86,8 @@ void check_trials(const qoiw::Core& core, const qoiw::frontend::PointPreparation
             restored += indices.size();
             lossless_bytes += qoiw::backend::encode_lossless(dtype, block.data(), bytes, indices).size();
         }
-        if (trial.core_bytes != core_bytes || trial.restored != restored || trial.lossless_bytes != lossless_bytes)
+        if (stats.core_bytes != core_bytes || stats.restored != restored || stats.lossless_bytes != lossless_bytes ||
+            stats.bytes_per_value != trial.bytes_per_value)
             throw std::runtime_error("candidate bytes or correction count disagree with scalar reference");
     }
 }
@@ -97,6 +121,8 @@ void round_trip(BoundCase selection) {
         qoiw::CoreParams params;
         // Deliberately overshoot the core's bound on ordinary inputs.
         if (core.name() == "mock:noise") params.options["factor"] = "3";
+        const auto selected = select_pointwise_bound(core, prep, params);
+        params.bound = selected.bound;
         if (selection == BoundCase::Candidates) {
             const auto& search = std::get<PointSearch>(prep.decision);
             if (search.sample.layout.dims != std::vector<std::uint64_t>{13, 13} ||
@@ -104,11 +130,11 @@ void round_trip(BoundCase selection) {
                 throw std::runtime_error("expected two 13 x 13 blocks from the original field");
             const auto& candidates = search.prior.candidates;
             if (candidates.empty()) throw std::runtime_error("expected positive candidate bounds");
-            check_trials<T>(core, prep, params);
-            params.bound = candidates.back();
+            if (core.name() == "mock:identity" && selected.bound != .25)
+                throw std::runtime_error("equal-cost identity trials should select the clean data bound");
+            check_trials<T>(core, prep, selected, params);
         } else {
-            params.bound = std::get<PointShortcut>(prep.decision).bound;
-            if (params.bound != fixed_bound.value_or(3 * 1e-9))
+            if (!selected.trace.empty() || params.bound != fixed_bound.value_or(3 * 1e-9))
                 throw std::runtime_error("unexpected compressor bound for shortcut");
         }
         const auto payload = core.compress(original.data(), dtype, dims, params);
@@ -162,6 +188,7 @@ void round_trip(BoundCase selection) {
 
 int main() {
     try {
+        affine_shortcut();
         for (const auto selection : {BoundCase::Candidates, BoundCase::Fixed, BoundCase::ZeroSample}) {
             round_trip<float>(selection);
             round_trip<double>(selection);

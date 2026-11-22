@@ -7,8 +7,8 @@ correction layer that restores selected values after core decompression.
 The encoder resolves point-wise tolerances from the original field and checks
 them against the core reconstruction. The frontend generates candidate
 compressor bounds and can select one when a shortcut applies. For other
-requests it measures each candidate on a sample of the field. Bound search, the SZ3
-adapter, and the CLI are in development for M1.
+requests it measures candidate bounds on a sample and selects one for
+full-field compression. The plan report, SZ3 adapter, and CLI are in development for M1.
 [Development plan](PLAN.md)
 
 ## Build and test
@@ -205,6 +205,24 @@ The default share is 0.1. For cores that declare a fixed cost per call, F4
 compresses a constant block at the same shape and bound to estimate overhead
 on multi-block samples. Each deduction is capped at the measured bytes of that
 block. The measurement retains the raw byte counts alongside its estimate.
+
+### Selecting the point-wise bound
+
+F5 measures the positive prior candidates, then refines around the cheapest
+one for up to four rounds. Each round measures the geometric midpoints to its
+neighbours. Refinement stops when the upper bound is within 5% of the lower
+bound or the interval cannot shrink further.
+
+The default choice is the smallest tried candidate within 2.5% of the lowest
+eligible cost. The frontend also probes an active data bound. If that probe
+needs zero restorations, the data bound joins the candidate set and takes
+precedence within the same cost band. A probe needing corrections can still
+compete if the prior or refinement independently proposes it. Strict cores
+measure only bounds at or below the data bound.
+
+The search returns the selected bound and the scalar F4 statistics for each
+distinct trial in measurement order. An F2 shortcut returns its bound with
+an empty trace.
 
 ## Reference benchmarks
 

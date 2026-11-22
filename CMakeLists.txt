@@ -28,7 +28,8 @@ add_library(qoiw STATIC
     src/frontend/prior.cpp
     src/frontend/prepare.cpp
     src/frontend/measure.cpp
-    src/frontend/sample.cpp)
+    src/frontend/sample.cpp
+    src/frontend/search.cpp)
 add_library(QOIW::qoiw ALIAS qoiw)
 qoiw_configure_target(qoiw)
 target_link_libraries(qoiw PUBLIC qoiw_decode PRIVATE ${QOIW_ZSTD_TARGET})

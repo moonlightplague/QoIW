@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### M1 point-wise bound search
+
+- Connect the search to F4 and return the selected bound and trial statistics. Run full-field container round trips at that bound for all six mock cores and both storage types.
+- Enforce the resolved data bound for strict cores and choose the smallest bound within the configured cost tolerance. Prefer the data bound within that band when the sample needs zero restorations.
+- Measure distinct positive prior candidates and refine around the lowest measured cost with geometric midpoints. Keep each trial's statistics in evaluation order.
+
 ### M1 candidate measurement
 
 - Compare F4's raw decodes, correction counts, and payload sizes with independent scalar checks across all six mock cores and both storage types. Document the cost calculation.
