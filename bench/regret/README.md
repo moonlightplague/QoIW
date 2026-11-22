@@ -6,6 +6,8 @@ using NumPy and supplies the same absolute values to QoIW and QPET. Use the
 pinned QPET build and local data layout from the reference guide.
 [Cases](../cases/regret.csv) · [Reference build and data](../reference/README.md)
 
+The sequential timing run uses the same manifest. [M1 timing and memory](PERFORMANCE.md)
+
 Build the QoIW CLI and the helper that exposes the smallest positive
 sampled F1 radius and scan cap. Build both compressors against the same
 SZ3 checkout and zstd. The example pins the system zstd CMake package on

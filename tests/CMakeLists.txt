@@ -122,6 +122,11 @@ if(Python3_Interpreter_FOUND)
         add_test(NAME benchmark.regret COMMAND Python3::Interpreter -B
             "${CMAKE_CURRENT_SOURCE_DIR}/unit/bench/test_regret.py")
     endif()
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_test(NAME benchmark.performance COMMAND Python3::Interpreter -B
+            "${CMAKE_CURRENT_SOURCE_DIR}/unit/bench/test_performance.py")
+        set_tests_properties(benchmark.performance PROPERTIES SKIP_RETURN_CODE 77)
+    endif()
     option(QOIW_TEST_FULL_MATRIX "Run the expanded point-wise guarantee matrix" OFF)
     add_executable(qoiw_matrix_probe property/roundtrip.cpp ../tools/qoiw/files.cpp)
     qoiw_configure_target(qoiw_matrix_probe)

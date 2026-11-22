@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### M1 performance benchmark
+
+- Record the 120 timing pairs and peak RSS results, including the one-thread compression and frontend misses and the SCALE decode outlier.
+- Read the probe's own peak resident memory and report per-case decode budget failures alongside corpus medians.
+- Document the measurement protocol and test paired timing ratios, baseline ordering, and budget thresholds.
+- Measure sequential, same-bound QoIW and plain SZ3 encode and decode pairs at one and sixteen threads. Report time budgets and compression peak RSS, with resumable measurement logs.
+
 ### M1 regret benchmark
 
 - Record the 20-case results, including zero violations, geometric mean regret of 1.04747, and the two smaller QoIW streams outside the symmetric parity band.
