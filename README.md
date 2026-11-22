@@ -9,9 +9,8 @@ them against the core reconstruction. The frontend generates candidate
 compressor bounds and can select one when a shortcut applies. For other
 requests it measures candidate bounds on a sample and selects one for
 full-field compression. Its C++ plan records the decision and the sample
-measurements and can be exported as JSON. The built-in SZ3 adapter supports
-point-wise compression and corrected container decoding. The integrated API
-and CLI are in development for M1.
+measurements and can be exported as JSON. The integrated C++ API uses SZ3 to
+compress a field and recover it with any required corrections.
 [Development plan](PLAN.md)
 
 ## Build and test
@@ -47,6 +46,46 @@ The common tests use known byte sequences and the CRC32C check value for
 and multi-field round trips. The SZ3 tests exercise both storage types and
 ranks 1 through 4. A stored two-chunk stream checks that OpenMP and serial
 builds reproduce the same corrected float32 values.
+
+## Compress and decompress a field
+
+Include `qoiw/qoiw.hpp` and link against `QOIW::qoiw`. This example takes a
+float32 field in C order and preserves the squared field to within 0.1% of its
+range and the data to within an absolute error of 0.1.
+
+```cpp
+#include <qoiw/qoiw.hpp>
+
+std::vector<float> round_trip(const std::vector<float>& values) {
+    qoiw::Request request;
+    request.targets.push_back(qoiw::Target::pointwise("x^2").rel(1e-3));
+    request.data_bound = qoiw::Tol::abs(0.1);
+    request.exact = "x > 1e30";
+
+    qoiw::Options options;
+    options.threads = 4;
+    qoiw::Report report;
+    const auto blob = qoiw::compress(qoiw::ArrayView(values.data(), {values.size()}), request, options, &report);
+    const auto info = qoiw::inspect(blob);
+    std::vector<float> decoded(info.num);
+    qoiw::decompress(blob, decoded.data(), decoded.size(), options.threads);
+    return decoded;
+}
+```
+
+The input buffer must hold the declared shape. Decode takes the output
+capacity in elements and checks it and the storage type before writing. Use
+the float or double overload indicated by `info.dtype`. Inspection returns
+owned metadata and section sizes. It works in builds where the stream's core
+is unavailable. Readers can link `qoiw_decode` by itself.
+
+The M1 request defaults to `Tol::none()` for the data bound. Use
+`Tol::abs(...)` or `Tol::rel(...)` to set an explicit constraint. Set
+`options.fixed_bound` to bypass tuning and retain the requested checks.
+The optional compression report records the plan, stored metadata and
+sizes, the number of restored values, and elapsed seconds for each stage.
+Catch `qoiw::Error` and use `code()` to distinguish failures such as an
+undersized output, an unavailable core, or a corrupt stream.
 
 ## SZ3 core
 

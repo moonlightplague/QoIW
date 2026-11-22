@@ -149,7 +149,7 @@ void thread_modes(const Core& core) {
 #endif
 }
 
-void chunked_golden() {
+void chunked_golden(bool sz3_enabled) {
     // SZ3 3.4.0, algo=nopred, two chunks. Each original is an integer plus
     // (0, .125), so a step of .25 reconstructs that integer before correction.
     std::ifstream file(QOIW_SZ3_GOLDEN, std::ios::binary);
@@ -168,6 +168,15 @@ void chunked_golden() {
         const double x = bucket + (1 + ((state >> 9) % 127)) / 1024.;
         y = static_cast<float>(std::abs(x * x - bucket * bucket) > 1 ? x : bucket);
     }
+    if (!sz3_enabled) {
+        try {
+            decompress(blob, out.data(), out.size());
+        } catch (const Error& error) {
+            if (error.code() == ErrorCode::Unsupported) return;
+            throw;
+        }
+        throw std::runtime_error("decoded SZ3 stream in a build without SZ3");
+    }
     for (int threads : {1, 2, 7}) {
         std::fill(out.begin(), out.end(), 17);
         const auto bytes = out.size() * sizeof(float);
@@ -180,6 +189,7 @@ void chunked_golden() {
 int main() {
     try {
         rejects([] { get_core("unknown"); });
+        chunked_golden(EXPECT_SZ3);
         if (!EXPECT_SZ3) {
             rejects([] { get_core("sz3"); });
             check(available_cores().empty(), "SZ3 listed in disabled build");
@@ -195,7 +205,6 @@ int main() {
         matrix<double>(core);
         check_arguments(core);
         thread_modes(core);
-        chunked_golden();
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';
         return 1;

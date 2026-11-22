@@ -4,6 +4,7 @@
 
 ### M1 integrated C++ API
 
+- Document the public round trip and check that the decode library can inspect existing SZ3 streams in builds with SZ3 disabled.
 - Add public point-wise requests, compression, inspection and capacity-checked decoding. Reuse frontend tuning and lossless correction and expose stream metadata, restoration counts and stage timings.
 
 ### M1 SZ3 adapter
