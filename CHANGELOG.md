@@ -4,6 +4,9 @@
 
 ### Readable CLI reports and runtime breakdown
 
+- Replace the CLI's `key=value` text with sectioned reports: aligned tables for the stream parts, checks, measured bounds and runtime, rounded numbers with grouped digits, and a closing summary that highlights the compression ratio, total time and result. `--color auto|always|never` styles the text; `auto` colours only terminals and honours `NO_COLOR`.
+- Break the compress command's runtime into reading, frontend, core (compress, decompress), backend (correction, container), verification (encoder check, `-a` decode and verify), writing and other, with shares of the total. Decompress, verify and inspect report their own stages.
+- Add a `runtime` object to the compress JSON. Decompress JSON is now `{"stream": ..., "runtime": ...}`; read the stream metadata from `stream`.
 - Report the total wall time of `compress` in `CompressionTimes::total`, and the parse, core and correction times of `decompress` through an optional `DecompressionTimes` argument.
 
 ### Core integration
