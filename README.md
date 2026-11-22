@@ -9,7 +9,9 @@ them against the core reconstruction. The frontend generates candidate
 compressor bounds and can select one when a shortcut applies. For other
 requests it measures candidate bounds on a sample and selects one for
 full-field compression. Its C++ plan records the decision and the sample
-measurements and can be exported as JSON. The SZ3 adapter and CLI are in development for M1.
+measurements and can be exported as JSON. The built-in SZ3 adapter supports
+point-wise compression and corrected container decoding. The integrated API
+and CLI are in development for M1.
 [Development plan](PLAN.md)
 
 ## Build and test
@@ -42,8 +44,30 @@ OpenMP synchronization. [LLVM Archer documentation](https://github.com/llvm/llvm
 
 The common tests use known byte sequences and the CRC32C check value for
 `123456789`. The container tests cover a fixed wire fixture, truncated inputs,
-and multi-field round trips. With SZ3 enabled, a separate test builds against its public C++ API
-and calls its compressed-size bound function to check linkage.
+and multi-field round trips. The SZ3 tests exercise both storage types and
+ranks 1 through 4. A stored two-chunk stream checks that OpenMP and serial
+builds reproduce the same corrected float32 values.
+
+## SZ3 core
+
+Use `qoiw::get_core("sz3")` to access the adapter and `qoiw::available_cores()`
+to list the cores in a build. Both are available through `qoiw/core.hpp`
+and the `qoiw_decode` library. The adapter accepts C-order float32 and
+float64 fields. `CoreParams::bound` is an absolute error bound, and zero
+requests a lossless stream. Set `params.options["algo"]` to `interp_lorenzo`
+(the default), `interp`, `lorenzo_reg`, or `nopred`.
+
+By default, thread count leaves the core stream byte-identical. To let an
+OpenMP build split the field into chunks, set
+`params.allow_stream_changing_parallelism = true` and request multiple
+threads. A thread count of zero uses the runtime default. A serial build
+can read either stream layout. If the available reader threads are fewer
+than the stored chunks, the adapter uses SZ3's serial chunk decoder.
+
+SZ3 stores its decoding configuration in the core stream. The adapter
+checks its storage type and dimensions against the QoIW field before
+decoding into the caller's buffer. The separate `decode_params` section is
+empty, and the container preserves all singleton axes of the original field.
 
 ## Container and lossless corrections
 

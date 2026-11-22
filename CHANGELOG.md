@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### M1 SZ3 adapter
+
+- Exercise SZ3 through point-wise planning, lossless correction and container decoding. Add a two-chunk golden stream that serial and OpenMP builds decode to the same 512 float32 values.
+- Keep SZ3 streams independent of thread count by default. Support opt-in chunked compression with task-local OpenMP settings and deterministic decoding within the reader's thread budget.
+- Add built-in core lookup and the optional SZ3 adapter to the decode library. Compress float32 and float64 fields with the four planned algorithms and check the stored layout before decoding into caller-owned memory.
+
 ### M1 point-wise plan reporting
 
 - Serialize the plan and every measured trial to JSON, including the exact predicate, shortcut reason and indicative compression ratio. Check the output with an independent JSON reader.

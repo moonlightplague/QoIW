@@ -9,12 +9,18 @@ include(cmake/QoiwZstd.cmake)
 
 add_library(qoiw_decode STATIC
     src/common/byte_reader.cpp
+    src/core/builtin.cpp
     src/container/reader.cpp
     src/backend/lossless_apply.cpp
     src/pipeline/decode_field.cpp)
 target_link_libraries(qoiw_decode PRIVATE ${QOIW_ZSTD_TARGET})
 target_include_directories(qoiw_decode PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
 qoiw_configure_target(qoiw_decode)
+if(QOIW_CORE_SZ3)
+    target_sources(qoiw_decode PRIVATE src/core/adapters/sz3.cpp)
+    target_compile_definitions(qoiw_decode PRIVATE QOIW_CORE_SZ3=1)
+    target_link_libraries(qoiw_decode PRIVATE SZ3::SZ3)
+endif()
 
 add_library(qoiw STATIC
     src/backend/lossless_encode.cpp

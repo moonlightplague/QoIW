@@ -49,4 +49,8 @@ class Core {
                             int threads, void* out, std::size_t out_bytes) const = 0;
 };
 
+// Built-in cores enabled in this build. Returned references have static lifetime.
+const Core& get_core(std::string_view name);
+std::vector<std::string> available_cores();
+
 }  // namespace qoiw

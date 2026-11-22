@@ -135,8 +135,13 @@ void round_trip(BoundCase selection) {
     // With one sample, F1 sees only the negative value at index zero.
     const PriorOptions options{selection == BoundCase::ZeroSample ? 1u : 0u, {}};
 
-    for (auto name : {"mock:identity", "mock:quantizer", "mock:noise", "mock:garbage", "mock:signflip", "mock:nan"}) {
-        const auto& core = qoiw::test::mock_core(name);
+    auto names = qoiw::available_cores();
+    names.insert(names.end(), {"mock:identity", "mock:quantizer", "mock:noise", "mock:garbage", "mock:signflip", "mock:nan"});
+    auto lookup = [](std::string_view name) -> const qoiw::Core& {
+        return name.substr(0, 5) == "mock:" ? qoiw::test::mock_core(name) : qoiw::get_core(name);
+    };
+    for (const auto& name : names) {
+        const auto& core = lookup(name);
         const auto prep = prepare_pointwise(dtype, original.data(), bytes, dims, spec, core.traits(dtype, dims.size()),
                                             2, fixed_bound, options, {.01, 16, 16, 2, 4});
         const auto& request = prep.resolved.request;
@@ -209,7 +214,7 @@ void round_trip(BoundCase selection) {
                 parsed.targets[1].expression != "x^2" || parsed.targets[1].tolerance_abs != 1.)
                 throw std::runtime_error("stored tolerances differ from scalar reference");
             std::vector<T> output(original.size());
-            const auto count = qoiw::pipeline::decode_field(parsed, 0, qoiw::test::mock_core(parsed.core_name),
+            const auto count = qoiw::pipeline::decode_field(parsed, 0, lookup(parsed.core_name),
                                                             threads, output.data(), bytes);
             if (count != restored || std::memcmp(output.data(), verified.data(), bytes))
                 throw std::runtime_error(std::string(name) + " decode differs from verified field");
