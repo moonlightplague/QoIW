@@ -19,6 +19,7 @@ struct CandidateStats {
     std::size_t core_bytes = 0, overhead_bytes = 0, lossless_bytes = 0;
     double input_sensitive_share = 0, sample_sensitive_share = 0, correction_weight = 1;
     bool rare_outlier_fallback = false;
+    double outlier_share = 0;  // Estimated fraction of full-field values requiring correction.
     double correction_bytes_per_value = 0, bytes_per_value = 0;
     std::optional<double> sample_psnr_db;
 
@@ -29,7 +30,7 @@ struct CandidateStats {
 
 struct PlanPrediction {
     double core_bytes_per_value = 0, correction_bytes_per_value = 0, bytes_per_value = 0;
-    double outlier_share = 0;  // Estimated fraction of full-field values requiring correction.
+    double outlier_share = 0;
     std::optional<double> sample_psnr_db;
     std::optional<double> indicative_compression_ratio;
 };
@@ -50,11 +51,15 @@ struct Plan {
     CorrectionMode correction_mode = CorrectionMode::Lossless;
     std::optional<Binding> binding;
     std::optional<double> data_bound_abs;
+    std::optional<std::string> exact_condition;
     std::vector<TargetTolerance> targets;
     std::optional<PlanPrediction> predicted;
     std::vector<CandidateStats> trace;  // Unique trials in measurement order.
     PlanFlags flags;
     std::optional<ShortcutReason> shortcut_reason;
+
+    // Missing measurements are JSON null. Infinite PSNR is "+inf" or "-inf".
+    std::string to_json() const;
 };
 
 }  // namespace qoiw

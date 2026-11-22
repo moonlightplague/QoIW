@@ -24,6 +24,7 @@ Plan plan_pointwise(const Core& core, const PointPreparation& prepared, CorePara
     plan.reference_bound = selection.bound;
     const auto& request = prepared.resolved.request;
     plan.data_bound_abs = request.data_bound_abs;
+    if (request.exact) plan.exact_condition = request.exact->text();
     for (const auto& target : request.targets)
         plan.targets.push_back({target.expression.text(), target.tolerance_abs});
     if (const auto* shortcut = std::get_if<PointShortcut>(&prepared.decision)) {
@@ -48,12 +49,10 @@ Plan plan_pointwise(const Core& core, const PointPreparation& prepared, CorePara
             return trial.bound < chosen->bound && trial.bytes_per_value < chosen->bytes_per_value;
         })) plan.binding = Binding::Tie;
 
-    const double outlier_share = chosen->rare_outlier_fallback ? rare_outlier_share * chosen->input_sensitive_share
-        : std::min(1., chosen->correction_weight * chosen->restored / chosen->sample_values);
     std::optional<double> ratio;
     if (chosen->bytes_per_value > 0) ratio = common::element_bytes(sample.dtype()) / chosen->bytes_per_value;
     plan.predicted = PlanPrediction{chosen->core_bytes_per_value(), chosen->correction_bytes_per_value,
-                                    chosen->bytes_per_value, outlier_share, chosen->sample_psnr_db, ratio};
+                                    chosen->bytes_per_value, chosen->outlier_share, chosen->sample_psnr_db, ratio};
     return plan;
 }
 

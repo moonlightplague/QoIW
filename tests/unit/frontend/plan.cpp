@@ -1,4 +1,6 @@
 #include <iostream>
+#include <limits>
+#include <locale>
 #include <stdexcept>
 
 #include "core/adapters/mock.hpp"
@@ -63,9 +65,15 @@ Plan fallback_plan() {
                                         {.01, 40, 40, 1, 1});
     return plan_pointwise(core, prep, {}, {}, .25);
 }
+
+class GroupedNumbers : public std::numpunct<char> {
+    char do_decimal_point() const override { return ','; }
+    char do_thousands_sep() const override { return '.'; }
+    std::string do_grouping() const override { return "\3"; }
+};
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
     try {
         const auto tie = tie_plan(.025);
         check(tie.bound[0] == 1 && tie.binding == Binding::Tie && tie.predicted->outlier_share == 0,
@@ -77,6 +85,22 @@ int main() {
               fallback.trace.size() == 1 && fallback.trace[0].restored == 0 &&
               fallback.predicted->outlier_share == .25 / 1000 &&
               fallback.predicted->correction_bytes_per_value == .25 / 1000 * 5, "rare-outlier prediction");
+        std::locale::global(std::locale(std::locale::classic(), new GroupedNumbers));
+        const double data[]{1, 2};
+        const auto prep = prepare_pointwise(DType::Float64, data, sizeof(data), {2}, {}, {}, 1, .5);
+        const auto fixed = plan_pointwise(test::mock_core("mock:identity"), prep);
+        check(fixed.to_json().find("\"predicted\":null,\"trace\":[]") != std::string::npos,
+              "unmeasured JSON prediction");
+        if (argc == 2 && std::string_view(argv[1]) == "--json") {
+            // Exercise string escapes and numeric boundaries through the public serializer.
+            Plan edge;
+            edge.targets.push_back({std::string("\"\n\\\0", 4), std::numeric_limits<double>::denorm_min()});
+            edge.trace.resize(1);
+            edge.trace[0].restored = 123456;
+            edge.trace[0].sample_psnr_db = -std::numeric_limits<double>::infinity();
+            const Plan* plans[]{&tie, &tighter, &fallback, &fixed, &edge};
+            for (const auto* p : plans) std::cout << p->to_json() << '\n';
+        }
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';
         return 1;

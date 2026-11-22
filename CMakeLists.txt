@@ -29,6 +29,7 @@ add_library(qoiw STATIC
     src/frontend/prepare.cpp
     src/frontend/measure.cpp
     src/frontend/plan.cpp
+    src/frontend/report.cpp
     src/frontend/sample.cpp
     src/frontend/search.cpp)
 add_library(QOIW::qoiw ALIAS qoiw)

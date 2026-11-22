@@ -148,11 +148,12 @@ const CandidateMeasurement& PointMeasurer::measure(double bound) {
                                                                      : share_below(block_radii_, bound);
     if (result.input_sensitive_share > 20 * result.sample_sensitive_share) {
         result.rare_outlier_fallback = true;
-        result.correction_bytes_per_value = rare_outlier_share_ * result.input_sensitive_share *
-                                            (common::element_bytes(sample.dtype()) + 1);
+        result.outlier_share = rare_outlier_share_ * result.input_sensitive_share;
+        result.correction_bytes_per_value = result.outlier_share * (common::element_bytes(sample.dtype()) + 1);
     } else {
         if (result.sample_sensitive_share > 0)
             result.correction_weight = result.input_sensitive_share / result.sample_sensitive_share;
+        result.outlier_share = std::min(1., result.correction_weight * result.restored / result.sample_values);
         result.correction_bytes_per_value = result.correction_weight * result.lossless_bytes / result.sample_values;
     }
     result.bytes_per_value = result.core_bytes_per_value() + result.correction_bytes_per_value;

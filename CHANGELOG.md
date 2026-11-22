@@ -4,6 +4,7 @@
 
 ### M1 point-wise plan reporting
 
+- Serialize the plan and every measured trial to JSON, including the exact predicate, shortcut reason and indicative compression ratio. Check the output with an independent JSON reader.
 - Return the selected lossless reference bound, resolved tolerances, cost and outlier predictions, decision flags and ordered trials in an owned C++ plan. Use its bound for full-field round trips across all six mock cores.
 - Measure sample PSNR after lossless correction using the finite, unmasked input range and sample count. Preserve exact reconstructions and empty samples as distinct outcomes.
 

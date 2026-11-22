@@ -116,6 +116,8 @@ void sensitive_shares(std::size_t in_field, bool one_in_sample, bool fallback) {
     const double correction = fallback ? .25 * input_share * 5 : weight * trial.lossless_bytes / 40;
     check(trial.correction_weight == weight && trial.correction_bytes_per_value == correction &&
           trial.bytes_per_value == sizeof(float) + correction, "weighted correction cost");
+    check(trial.outlier_share == (fallback ? .25 * input_share : std::min(1., weight)),
+          "estimated full-field outlier share");
     check(std::get<std::vector<std::vector<float>>>(trial.decoded)[0][0] == field[480] + 3, "core options lost");
 }
 

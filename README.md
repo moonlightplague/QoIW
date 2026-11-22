@@ -8,7 +8,8 @@ The encoder resolves point-wise tolerances from the original field and checks
 them against the core reconstruction. The frontend generates candidate
 compressor bounds and can select one when a shortcut applies. For other
 requests it measures candidate bounds on a sample and selects one for
-full-field compression. The plan report, SZ3 adapter, and CLI are in development for M1.
+full-field compression. Its C++ plan records the decision and the sample
+measurements and can be exported as JSON. The SZ3 adapter and CLI are in development for M1.
 [Development plan](PLAN.md)
 
 ## Build and test
@@ -223,6 +224,39 @@ measure only bounds at or below the data bound.
 The search returns the selected bound and the scalar F4 statistics for each
 distinct trial in measurement order. An F2 shortcut returns its bound with
 an empty trace.
+
+### Reading a point-wise plan
+
+`qoiw::Plan` owns its data. Use `plan.bound[0]` for the field's core call and
+`plan.to_json()` to export the report. M1 uses lossless corrections, so the
+selected bound also serves as `reference_bound`. The report includes the
+absolute data bound, each target's expression and absolute tolerance, and the
+exact predicate when supplied.
+
+For a measured search, `predicted` gives core and correction bytes per input
+value and their sum. The indicative compression ratio divides the storage
+width by that sum and is absent for a zero cost estimate. The predicted
+outlier share is the sample's restored fraction times its correction weight,
+capped at one. When the selected trial uses the rare-outlier fallback, the
+estimate is the configured rare-outlier share times the sensitive input
+fraction. Each trace entry retains the raw counts and its own fallback flag.
+
+Sample PSNR uses the full finite, unmasked input range and the mean squared
+error of the corrected blocks over their finite, unmasked original values.
+JSON uses `"+inf"` for a perfect reconstruction, `"-inf"` for a zero range
+with positive error, and `null` when no sample values qualify.
+
+`binding` records how F5 chose the bound. A data-only request or a selected
+data cap gives `DATA_BOUND`. If the clean cap won over a strictly cheaper,
+tighter QoI candidate inside the tie band, the result is `TIE`. A QoI or
+exact predicate that selects a different bound gives `QOI`. The same
+cap comparison applies to a single affine candidate. A fixed bound, a
+zero-radius fallback, or a request without constraints has no binding label.
+
+A shortcut records its reason, an empty trace and a null prediction.
+`whole_input_sampled` describes the blocks actually measured,
+`rare_outlier_fallback` describes the selected trial, and `prior_free`
+is false for the M1 point-wise algorithm.
 
 ## Reference benchmarks
 
