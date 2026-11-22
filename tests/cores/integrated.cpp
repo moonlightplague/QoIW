@@ -67,10 +67,20 @@ void round_trip(bool fixed) {
           report.plan.trace.empty() == fixed &&
           (fixed ? field.bound == *options.fixed_bound && field.lossless_bytes > 0 && report.restored > 0
                  : field.bound <= field.data_bound_abs.value()), "incorrect compression report");
+    const auto& times = report.seconds;
+    const double stages = times.planning + times.core_encode + times.core_decode + times.correction +
+                          times.container + times.verification;
+    check(std::min({times.planning, times.core_encode, times.core_decode, times.correction, times.container,
+                    times.verification}) >= 0 && times.total >= stages, "inconsistent compression times");
 
     std::vector<T> out(info.num + 1, 123);
-    decompress(blob, out.data(), out.size(), 0);
+    DecompressionTimes decode_times;
+    decode_times.total = -1;
+    decompress(blob, out.data(), out.size(), 0, &decode_times);
     check(out.back() == 123, "decoder touched capacity past the declared field");
+    check(std::min({decode_times.parse, decode_times.core_decode, decode_times.correction}) >= 0 &&
+          decode_times.total >= decode_times.parse + decode_times.core_decode + decode_times.correction,
+          "inconsistent decompression times");
     double max_data_error = 0, max_square_error = 0, max_sin_error = 0;
     for (std::size_t i = 0; i < data.size(); ++i) {
         const double x = data[i], y = out[i];
@@ -131,6 +141,10 @@ void bad_arguments() {
     rejects(ErrorCode::InvalidArgument, [&] { decompress(blob, out, 3); });
     rejects(ErrorCode::InvalidArgument, [&] { decompress(blob, out, 4, -1); });
     rejects(ErrorCode::CorruptStream, [&] { decompress({blob.data(), blob.size() - 1}, out, 4); });
+    DecompressionTimes untouched;
+    untouched.total = 7;
+    rejects(ErrorCode::InvalidArgument, [&] { decompress(blob, out, 3, 1, &untouched); });
+    check(untouched.total == 7, "failed decompression assigned stage times");
     auto unavailable = container::read(blob);
     unavailable.core_name = "unavailable";
     const auto unavailable_blob = container::write(unavailable);

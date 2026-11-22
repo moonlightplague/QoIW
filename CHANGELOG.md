@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Readable CLI reports and runtime breakdown
+
+- Report the total wall time of `compress` in `CompressionTimes::total`, and the parse, core and correction times of `decompress` through an optional `DecompressionTimes` argument.
+
 ### Core integration
 
 - Generate the built-in core registry from the CMake adapter source list. An adapter supplies a matching header and factory.
