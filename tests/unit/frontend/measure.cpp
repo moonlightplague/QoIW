@@ -36,7 +36,10 @@ void whole_field() {
           !trial.rare_outlier_fallback && trial.bytes_per_value == (16 + lossless.size()) / 4., "whole-field cost");
     check(std::get<std::vector<std::vector<T>>>(trial.decoded) == std::vector<std::vector<T>>{{0, 1, 0, -1}},
           "cache must retain the uncorrected core values");
+    const double expected_db = 20 * std::log10(2.5 / std::sqrt(2 * .25 * .25 / 4));
+    check(std::abs(trial.sample_psnr_db.value() - expected_db) < 1e-12, "quality must use corrected values");
     const auto& zero = measure.measure(0);
+    check(zero.sample_psnr_db == std::numeric_limits<double>::infinity(), "exact decode has infinite PSNR");
     check(zero.restored == 0 && zero.lossless_bytes == 0 && &trial == &measure.measure(.5), "repeated bound");
     for (double bad : {-1., std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()}) {
         try {
@@ -46,6 +49,41 @@ void whole_field() {
         }
         throw std::runtime_error("invalid bound accepted");
     }
+}
+
+void masked_sample_quality() {
+    const auto& core = test::mock_core("mock:quantizer");
+    std::vector<double> field(1000, .25);
+    field[0] = -8;
+    field[1] = 8;
+    field[480] = 1e36;
+    field[481] = std::numeric_limits<double>::quiet_NaN();
+    const PointRequest spec{{}, {}, Expr("x > 9")};
+    auto quality = [&] {
+        const auto prep = prepare_pointwise(DType::Float64, field.data(), field.size() * sizeof(double),
+                                            {1000}, spec, core.traits(DType::Float64, 1), 2, {}, {},
+                                            {.01, 40, 40, 1, 1});
+        const auto& search = std::get<PointSearch>(prep.decision);
+        check(search.sample.layout.origins == std::vector<std::size_t>{480}, "quality sample origin");
+        PointMeasurer meter(core, prep.resolved, search);
+        return meter.measure(.5).sample_psnr_db;
+    };
+    check(std::abs(quality().value() - 20 * std::log10(16 / .25)) < 1e-12, "full range and eligible denominator");
+    std::fill(field.begin() + 482, field.begin() + 520, 1e36);
+    check(!quality(), "sample with no eligible values has no PSNR");
+}
+
+void extreme_quality() {
+    const auto& core = test::mock_core("mock:signflip");
+    auto quality = [&](std::vector<double> field) {
+        const auto prep = prepare_pointwise(DType::Float64, field.data(), 2 * sizeof(double), {2}, {}, {}, 1);
+        PointMeasurer meter(core, prep.resolved, std::get<PointSearch>(prep.decision));
+        return meter.measure(std::numeric_limits<double>::max()).sample_psnr_db.value();
+    };
+    const auto huge = std::numeric_limits<double>::max();
+    check(std::abs(quality({-huge, huge})) < 1e-12, "overflow in span or squared error");
+    check(std::abs(quality({0., std::numeric_limits<double>::denorm_min()}) + 10 * std::log10(2.)) < 1e-12,
+          "underflow in squared error");
 }
 
 void sensitive_shares(std::size_t in_field, bool one_in_sample, bool fallback) {
@@ -78,6 +116,8 @@ void sensitive_shares(std::size_t in_field, bool one_in_sample, bool fallback) {
     const double correction = fallback ? .25 * input_share * 5 : weight * trial.lossless_bytes / 40;
     check(trial.correction_weight == weight && trial.correction_bytes_per_value == correction &&
           trial.bytes_per_value == sizeof(float) + correction, "weighted correction cost");
+    check(trial.outlier_share == (fallback ? .25 * input_share : std::min(1., weight)),
+          "estimated full-field outlier share");
     check(std::get<std::vector<std::vector<float>>>(trial.decoded)[0][0] == field[480] + 3, "core options lost");
 }
 
@@ -140,6 +180,8 @@ int main() {
     try {
         whole_field<float>();
         whole_field<double>();
+        masked_sample_quality();
+        extreme_quality();
         sensitive_shares(0, false, false);
         sensitive_shares(1, false, true);
         sensitive_shares(1, true, false);

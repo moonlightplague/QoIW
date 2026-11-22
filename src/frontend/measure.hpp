@@ -6,14 +6,7 @@
 
 namespace qoiw::frontend {
 
-struct CandidateStats {
-    double bound = 0;
-    std::size_t sample_values = 0, restored = 0;
-    std::size_t core_bytes = 0, overhead_bytes = 0, lossless_bytes = 0;
-    double input_sensitive_share = 0, sample_sensitive_share = 0, correction_weight = 1;
-    bool rare_outlier_fallback = false;
-    double correction_bytes_per_value = 0, bytes_per_value = 0;
-};
+using qoiw::CandidateStats;
 
 struct CandidateMeasurement : CandidateStats {
     SampleBlocks decoded;  // Raw core reconstruction, before any correction.
@@ -31,13 +24,14 @@ class PointMeasurer {
 
    private:
     const Core& core_;
-    const ResolvedPointRequest& request_;
+    const PointResolution& resolved_;
     const PointSearch& search_;
     CoreParams params_;
     CoreTraits traits_;
     int threads_;
     double rare_outlier_share_;
     std::vector<double> block_radii_;
+    std::size_t quality_values_ = 0;
     std::map<double, CandidateMeasurement> cache_;
 };
 
