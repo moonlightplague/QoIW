@@ -5,6 +5,7 @@
 #include <charconv>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <string_view>
 
 #include "common/shape.hpp"
@@ -118,6 +119,10 @@ CLI::App& subcommand(CLI::App& root, const char* name, const char* description, 
             ->check(CLI::Range(0, std::numeric_limits<int>::max(), "NONNEGATIVE"))->take_last()->capture_default_str();
     }
     if (command != Command::Cores) app.add_flag("--json", args.json, "Print a JSON report");
+    const std::map<std::string, ColorMode> colors{
+        {"auto", ColorMode::Auto}, {"always", ColorMode::Always}, {"never", ColorMode::Never}};
+    app.add_option("--color", args.color, "Colour the text report: auto (terminal only), always or never")
+        ->transform(CLI::CheckedTransformer(colors, CLI::ignore_case))->take_last()->type_name("WHEN");
     return app;
 }
 

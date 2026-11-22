@@ -1,5 +1,6 @@
 #include "qoiw/qoiw.hpp"
 
+#include <chrono>
 #include <new>
 
 #include "common/byte_io.hpp"
@@ -47,9 +48,18 @@ container::Stream parse(Bytes bytes) {
     }
 }
 
-void decode(Bytes bytes, DType dtype, void* output, std::size_t capacity, int threads) {
+using Clock = std::chrono::steady_clock;
+
+double seconds_since(Clock::time_point start) {
+    return std::chrono::duration<double>(Clock::now() - start).count();
+}
+
+void decode(Bytes bytes, DType dtype, void* output, std::size_t capacity, int threads, DecompressionTimes* times) {
+    const auto start = Clock::now();
     if (!output || threads < 0) throw Error(ErrorCode::InvalidArgument, "invalid decode buffer or thread count");
     const auto stream = parse(bytes);
+    DecompressionTimes result;
+    result.parse = seconds_since(start);
     if (stream.fields.size() != 1) throw Error(ErrorCode::Unsupported, "expected a single-field stream");
     if (dtype != stream.dtype) throw Error(ErrorCode::InvalidArgument, "output type disagrees with the stream");
     const auto required = common::array_bytes(dtype, stream.dims);
@@ -63,12 +73,14 @@ void decode(Bytes bytes, DType dtype, void* output, std::size_t capacity, int th
     }
     if (!core->supports(dtype, stream.dims)) throw Error(ErrorCode::Unsupported, "core cannot decode stored field shape");
     try {
-        pipeline::decode_field(stream, 0, *core, threads, output, required);
+        pipeline::decode_field(stream, 0, *core, threads, output, required, &result);
     } catch (const std::bad_alloc&) {
         throw;
     } catch (const std::exception& error) {
         throw Error(ErrorCode::CorruptStream, error.what());
     }
+    result.total = seconds_since(start);
+    if (times) *times = result;
 }
 }  // namespace
 
@@ -76,12 +88,12 @@ StreamInfo inspect(Bytes stream) {
     return pipeline::describe_stream(parse(stream), stream.size);
 }
 
-void decompress(Bytes stream, float* out, std::size_t capacity, int threads) {
-    decode(stream, DType::Float32, out, capacity, threads);
+void decompress(Bytes stream, float* out, std::size_t capacity, int threads, DecompressionTimes* times) {
+    decode(stream, DType::Float32, out, capacity, threads, times);
 }
 
-void decompress(Bytes stream, double* out, std::size_t capacity, int threads) {
-    decode(stream, DType::Float64, out, capacity, threads);
+void decompress(Bytes stream, double* out, std::size_t capacity, int threads, DecompressionTimes* times) {
+    decode(stream, DType::Float64, out, capacity, threads, times);
 }
 
 }  // namespace qoiw

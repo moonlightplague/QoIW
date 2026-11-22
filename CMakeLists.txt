@@ -53,7 +53,8 @@ endif()
 
 option(QOIW_BUILD_TOOLS "Build the QoIW command-line tool" ON)
 if(QOIW_BUILD_TOOLS)
-    add_executable(qoiw_cli tools/qoiw/main.cpp tools/qoiw/arguments.cpp tools/qoiw/files.cpp)
+    add_executable(qoiw_cli tools/qoiw/main.cpp tools/qoiw/arguments.cpp tools/qoiw/console.cpp
+        tools/qoiw/files.cpp tools/qoiw/render.cpp)
     set_target_properties(qoiw_cli PROPERTIES OUTPUT_NAME qoiw)
     qoiw_configure_target(qoiw_cli)
     target_include_directories(qoiw_cli SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/CLI11")

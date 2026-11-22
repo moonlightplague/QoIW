@@ -84,8 +84,10 @@ struct Request {
 std::vector<std::uint8_t> compress(const ArrayView& input, const Request& = {}, const Options& = {},
                                    Report* report = nullptr);
 StreamInfo inspect(Bytes stream);
-void decompress(Bytes stream, float* out, std::size_t capacity, int threads = 1);
-void decompress(Bytes stream, double* out, std::size_t capacity, int threads = 1);
+void decompress(Bytes stream, float* out, std::size_t capacity, int threads = 1,
+                DecompressionTimes* times = nullptr);
+void decompress(Bytes stream, double* out, std::size_t capacity, int threads = 1,
+                DecompressionTimes* times = nullptr);
 Verification verify(const ArrayView& original, const ArrayView& reconstructed, const Request& = {},
                     int threads = 1);
 ```
@@ -97,7 +99,9 @@ Verification verify(const ArrayView& original, const ArrayView& reconstructed, c
   without needing the stream's core.
 - **`decompress`** checks the storage type against the stream and the
   capacity (in elements) against the field before writing. Use the overload
-  for `info.dtype`. The output is valid only after the call returns.
+  for `info.dtype`. The output is valid only after the call returns. If
+  `times` is not null it is assigned the stage times on success and left
+  unchanged on failure.
 - **`verify`** checks two fields of the same shape and type. It resolves
   relative tolerances on `original` exactly as `compress` does and runs the
   backend check in diagnostic mode. It needs no core.
@@ -148,10 +152,30 @@ One measured bound: `bound`, `sample_values`, `restored`, raw `core_bytes`
 ### `Report`
 
 `plan`; `stream` (`StreamInfo` of the result); `nonfinite_inputs`; `restored`
-(values in the LOSSLESS layer); `seconds` with `planning`, `core_encode`,
-`core_decode`, `correction`, `container`, `verification`; and `verification`
-of the corrected reconstruction against the resolved request. `to_json()`
-serializes all of it.
+(values in the LOSSLESS layer); `seconds` (`CompressionTimes`, below); and
+`verification` of the corrected reconstruction against the resolved request.
+`to_json()` serializes all of it.
+
+### `CompressionTimes` and `DecompressionTimes`
+
+Wall-clock seconds measured with `std::chrono::steady_clock`.
+
+| Field | Stage |
+| --- | --- |
+| `CompressionTimes::planning` | Frontend, F0 to F6. |
+| `core_encode`, `core_decode` | The full-field core compression and decompression. |
+| `correction` | Backend check and LOSSLESS encoding and application. |
+| `container` | Writing the container. |
+| `verification` | The report's check of the corrected reconstruction (only with a report). |
+| `total` | The whole `compress` call. At least the sum of the stages; the difference is buffer allocation and bookkeeping. |
+| `DecompressionTimes::parse` | Parsing and validating the container header and sections. |
+| `core_decode` | The core's decompression. |
+| `correction` | Validating and applying the LOSSLESS layer. |
+| `total` | The whole `decompress` call. |
+
+`DecompressionTimes::to_json()` writes `{"parse", "core_decode",
+"correction", "total"}`; `Report::to_json()` writes `seconds` with every
+`CompressionTimes` field.
 
 ### `StreamInfo`
 
