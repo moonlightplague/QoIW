@@ -146,6 +146,24 @@ When a compression report is requested, its `verification` field measures
 the corrected reconstruction with the same resolved tolerances used by the
 encoder. This additional pass is timed in `seconds.verification`.
 
+The independent checker in `tests/reference/qoi_numpy.py` reads the original
+and decoded raw files and evaluates NumPy formulas supplied by each test.
+From `tests/reference`, a squared-field check looks like this.
+
+```python
+import numpy as np
+from qoi_numpy import Target, Tolerance, check_files
+
+targets = [Target("x^2", np.square, Tolerance("REL", 1e-3))]
+report = check_files("U.f32", "U.out.f32", "<f4", (100, 500, 500), targets)
+assert report["ok"], report
+```
+
+The checker resolves relative bounds from the original field. It checks
+the stored bits for exactness and allows a relative comparison slack of
+`1e-9` on numerical bounds. Use `relative_slack=0` for strict comparisons.
+CTest runs the checker when NumPy is available for its Python interpreter.
+
 ## SZ3 core
 
 Use `qoiw::get_core("sz3")` to access the adapter and `qoiw::available_cores()`

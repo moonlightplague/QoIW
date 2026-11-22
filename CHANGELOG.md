@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### M1 independent NumPy checker
+
+- Run independent checks on fresh float32 and float64 CLI decodes in CI, including a changed value that makes a QoI non-finite.
+- Verify raw float32 and float64 reconstructions with NumPy formulas, independent tolerance resolution, and bit-exact checks for special values.
+
 ### CLI parser
 
 - Use the vendored CLI11 v2.7.2 single header for command, option and help parsing while preserving the point-wise workflow.

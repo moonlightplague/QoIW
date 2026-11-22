@@ -118,11 +118,20 @@ target_link_libraries(qoiw_test_plan PRIVATE qoiw_mock_cores QOIW::qoiw)
 add_test(NAME frontend.plan COMMAND qoiw_test_plan)
 find_package(Python3 QUIET COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
+    add_test(NAME reference.numpy COMMAND Python3::Interpreter -B
+        "${CMAKE_CURRENT_SOURCE_DIR}/reference/test_qoi_numpy.py")
+    set_tests_properties(reference.numpy PROPERTIES SKIP_RETURN_CODE 77)
     add_test(NAME frontend.plan_json COMMAND Python3::Interpreter
         "${CMAKE_CURRENT_SOURCE_DIR}/unit/frontend/plan_json.py" $<TARGET_FILE:qoiw_test_plan>)
     if(QOIW_BUILD_TOOLS)
         add_test(NAME cli.pointwise COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/cli/pointwise.py"
             $<TARGET_FILE:qoiw_cli> $<BOOL:${QOIW_CORE_SZ3}> "${CMAKE_CURRENT_SOURCE_DIR}/golden/m1-sz3-chunked.qoiw")
         set_tests_properties(cli.pointwise PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=4;OMP_DYNAMIC=FALSE")
+        if(QOIW_CORE_SZ3)
+            add_test(NAME reference.numpy_cli COMMAND Python3::Interpreter -B
+                "${CMAKE_CURRENT_SOURCE_DIR}/reference/check_cli.py" $<TARGET_FILE:qoiw_cli>)
+            set_tests_properties(reference.numpy_cli PROPERTIES SKIP_RETURN_CODE 77
+                ENVIRONMENT "OMP_NUM_THREADS=4;OMP_DYNAMIC=FALSE")
+        endif()
     endif()
 endif()

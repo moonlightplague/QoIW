@@ -24,6 +24,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
+      - name: Install NumPy for the independent checker
+        run: |
+          python3 -m venv "$RUNNER_TEMP/qoiw-python"
+          "$RUNNER_TEMP/qoiw-python/bin/python" -m pip install numpy
       - name: Install OpenMP-aware ThreadSanitizer
         if: matrix.sanitizer == 'thread'
         run: |
@@ -37,6 +41,7 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.type }}
           -DQOIW_WARNINGS_AS_ERRORS=ON -DQOIW_SANITIZE=${{ matrix.sanitizer }}
           -DQOIW_CORE_SZ3=${{ matrix.sz3 }}
+          -DPython3_EXECUTABLE="$RUNNER_TEMP/qoiw-python/bin/python"
           ${{ matrix.sanitizer == 'thread' && '-DCMAKE_REQUIRE_FIND_PACKAGE_OpenMP=ON' || '' }}
       - run: cmake --build build --parallel
       - name: Test
