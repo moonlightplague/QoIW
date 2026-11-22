@@ -5,6 +5,7 @@
 #include <cmath>
 #include <map>
 #include <stdexcept>
+#include <utility>
 
 namespace qoiw::frontend {
 namespace {
@@ -89,6 +90,8 @@ BoundSelection search_pointwise_bounds(std::vector<double> candidates, const Mea
         return result.trace[it->second.index];
     };
 
+    // A separate cap probe enters the bracket only when it needs no correction.
+    // A cap proposed by the prior or a midpoint competes on cost in either case.
     const bool clean_cap = data_bound && trial(*data_bound, false).restored == 0;
     if (clean_cap) {
         const auto pos = std::lower_bound(candidates.begin(), candidates.end(), *data_bound);
@@ -109,6 +112,17 @@ BoundSelection search_pointwise_bounds(std::vector<double> candidates, const Mea
         }
     }
     return result;
+}
+
+BoundSelection select_pointwise_bound(const Core& core, const PointPreparation& prepared, CoreParams params,
+                                      const SearchOptions& options, double rare_outlier_share) {
+    if (const auto* shortcut = std::get_if<PointShortcut>(&prepared.decision)) return {shortcut->bound, {}};
+    const auto& search = std::get<PointSearch>(prepared.decision);
+    const auto kind = core.traits(search.sample.dtype(), search.sample.layout.dims.size()).bound_kind;
+    PointMeasurer meter(core, prepared.resolved, search, std::move(params), rare_outlier_share);
+    return search_pointwise_bounds(search.prior.candidates,
+        [&](double bound) -> CandidateStats { return meter.measure(bound); },
+        options, prepared.resolved.request.data_bound_abs, kind);
 }
 
 }  // namespace qoiw::frontend
