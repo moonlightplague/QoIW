@@ -1,424 +1,120 @@
 # QoIW
 
-QoIW is a C++17 wrapper under development for preserving quantities of interest
-when compressing fixed-grid scientific arrays. The libraries include a
-single-variable expression engine, a sectioned container, and a lossless
-correction layer that restores selected values after core decompression.
-The encoder resolves point-wise tolerances from the original field and checks
-them against the core reconstruction. The frontend generates candidate
-compressor bounds and can select one when a shortcut applies. For other
-requests it measures candidate bounds on a sample and selects one for
-full-field compression. Its C++ plan records the decision and the sample
-measurements and can be exported as JSON. The integrated C++ API uses SZ3 to
-compress a field and recover it with any required corrections.
-[Development plan](PLAN.md)
+QoIW compresses fixed-grid scientific arrays with an unmodified lossy
+compressor (SZ3) so that user-stated quantities of interest (QoIs) stay
+within their tolerances. It predicts one error bound for the compressor from
+a sample, compresses once, checks every decoded value against the original,
+and stores the values that break a tolerance losslessly.
 
-## Build and test
+Technical documentation: [docs/](docs/README.md) · Development plan:
+[PLAN.md](PLAN.md) · [Changelog](CHANGELOG.md)
 
-Use CMake 3.19 or newer, a C++17 compiler, and the zstd development package
-(1.4 or newer). The correction layer uses zstd in all builds. The default
-build also uses the pinned SZ3 submodule.
+## Build
+
+You need CMake 3.19 or newer, a C++17 compiler and the zstd development
+package (1.4 or newer). OpenMP is used when found.
 
 ```sh
 git submodule update --init SZ3
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
-(cd build && ctest --output-on-failure)
+ctest --test-dir build --output-on-failure
 ```
 
-| CMake option | Effect |
-| --- | --- |
-| `QOIW_CORE_SZ3=OFF` | Build and test the libraries without SZ3. |
-| `QOIW_SZ3_SOURCE_DIR=/path/to/SZ3` | Use a compatible SZ3 source checkout. |
-| `QOIW_SZ3_USE_INSTALLED=ON` | Find the SZ3 3.4 CMake package. Use `CMAKE_PREFIX_PATH` for a custom install prefix. |
-| `QOIW_FETCH_DEPS=ON` | Fetch zstd 1.5.6 for the correction layer if system zstd is unavailable. |
-| `QOIW_BUILD_TOOLS=OFF` | Skip the `qoiw` command-line tool. |
-| `QOIW_BUILD_TESTS=OFF` | Skip the tests. |
-| `QOIW_BUILD_BENCHMARKS=ON` | Build the regret and performance benchmark helpers. |
-| `QOIW_TEST_FULL_MATRIX=ON` | Select the expanded guarantee matrix for CTest. |
-| `QOIW_WARNINGS_AS_ERRORS=ON` | Treat QoIW warnings as errors under GCC and Clang. |
-| `QOIW_SANITIZE=address`, `undefined`, or `thread` | Instrument a build with one sanitizer. The default is `none`. |
+The tool is `build/qoiw`. Common options: `-DQOIW_FETCH_DEPS=ON` fetches
+zstd when no system package is found, `-DQOIW_CORE_SZ3=OFF` builds without
+SZ3, `-DQOIW_BUILD_TESTS=OFF` skips the tests. All options:
+[docs/building.md](docs/building.md).
 
-The encoder uses OpenMP when available. Configure with
-`-DCMAKE_DISABLE_FIND_PACKAGE_OpenMP=ON` for a serial build. The
-ThreadSanitizer job uses Clang and LLVM Archer so the race detector observes
-OpenMP synchronization. [LLVM Archer documentation](https://github.com/llvm/llvm-project/blob/release/18.x/openmp/tools/archer/README.md)
+## Quick start
 
-The common tests use known byte sequences and the CRC32C check value for
-`123456789`. The container tests cover a fixed wire fixture, truncated inputs,
-and multi-field round trips. The SZ3 tests exercise both storage types and
-ranks 1 through 4. A stored two-chunk stream checks that OpenMP and serial
-builds reproduce the same corrected float32 values.
-
-The small guarantee matrix runs in CTest as `property.guarantees` when
-NumPy is available. It covers both storage types, ranks 1 through 4, 32
-point-wise expressions, SZ3 when enabled, and six mock cores. Each case
-compares the serial and threaded streams and checks that a decode of the
-saved container matches the bits checked by the encoder. The NumPy
-checker then reads the decoded file and checks the requested constraints.
-The scheduled Release job checks out `dev` and runs the expanded profile
-once the workflow is on the default branch. To run it locally, configure
-with `-DQOIW_TEST_FULL_MATRIX=ON` and run
-`ctest --test-dir build -R '^property.guarantees$' --output-on-failure`.
-[GitHub Actions schedule requirements](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
-
-## Command line
-
-The CLI uses the bundled CLI11 v2.7.2 single header in `third_party/CLI11`.
-[Upstream release](https://github.com/CLIUtils/CLI11/releases/tag/v2.7.2) · [CLI11 license](LICENSES/CLI11.txt)
-
-The default build produces `build/qoiw`. The CLI reads and writes files of
-little-endian float32 or float64 values in C order. For a field with shape
-`100,500,500`, use the following commands.
+Keep `x^2` within 0.1 % of its range at every value of a `100 × 500 × 500`
+float32 field, check the result, and decode it:
 
 ```sh
-build/qoiw compress -f --shape 100,500,500 -i U.f32 -q 'x^2' -m REL 1e-3 -z U.qoiw -a -v
-build/qoiw inspect -z U.qoiw --json
+build/qoiw compress   -f --shape 100,500,500 -i U.f32 -q 'x^2' -m REL 1e-3 -z U.qoiw -a
+build/qoiw inspect    -z U.qoiw
 build/qoiw decompress -z U.qoiw -o U.out.f32
-build/qoiw verify -f --shape 100,500,500 -i U.f32 -o U.out.f32 -q 'x^2' -m REL 1e-3
-build/qoiw cores
+build/qoiw verify     -f --shape 100,500,500 -i U.f32 -o U.out.f32 -q 'x^2' -m REL 1e-3
 ```
 
-Use `-d` for float64. The legacy form `-3 500 500 100` takes extents in
-fastest-varying-first order. Choose one shape form per command. Each
-`-q` starts a point-wise target and takes one `-m ABS value` or
-`-m REL fraction`. Use `-M` to set the data bound and `-X` to set an
-exact predicate. Run `build/qoiw <command> --help` for the long options.
+On Hurricane ISABEL `Uf48.bin.f32` this gives a 4.5 MB stream (ratio 22.05),
+with 308,049 values restored and every value within tolerance.
 
-Compression with `-a` decodes and verifies the finished stream before
-publishing the output. Omit `-z` to measure compression without saving
-a container. The CLI stages completed outputs beside the destination and
-rejects attempts to write over the input. Exit status 0 means success,
-2 means a verification constraint failed, and 1 means an argument,
-file, or processing error.
-
-Use `-v` for the search trace. With `--json`, compression emits the full
-`report`, including the plan and trace, and `post_decode` contains the
-fresh verification result when `-a` is set. `inspect` and `decompress`
-emit stream metadata with `--json`, and `verify` emits the verification
-result.
-
-## Compress and decompress a field
-
-Include `qoiw/qoiw.hpp` and link against `QOIW::qoiw`. This example takes a
-float32 field in C order and preserves the squared field to within 0.1% of its
-range and the data to within an absolute error of 0.1.
+From C++, link `QOIW::qoiw`:
 
 ```cpp
 #include <qoiw/qoiw.hpp>
 
-std::vector<float> round_trip(const std::vector<float>& values) {
-    qoiw::Request request;
-    request.targets.push_back(qoiw::Target::pointwise("x^2").rel(1e-3));
-    request.data_bound = qoiw::Tol::abs(0.1);
-    request.exact = "x > 1e30";
+qoiw::Request request;
+request.targets.push_back(qoiw::Target::pointwise("x^2").rel(1e-3));
+const auto blob = qoiw::compress(qoiw::ArrayView(data.data(), {100, 500, 500}), request);
 
-    qoiw::Options options;
-    options.threads = 4;
-    qoiw::Report report;
-    const auto blob = qoiw::compress(qoiw::ArrayView(values.data(), {values.size()}), request, options, &report);
-    const auto info = qoiw::inspect(blob);
-    std::vector<float> decoded(info.num);
-    qoiw::decompress(blob, decoded.data(), decoded.size(), options.threads);
-    return decoded;
-}
+std::vector<float> decoded(qoiw::inspect(blob).num);
+qoiw::decompress(blob, decoded.data(), decoded.size());
 ```
 
-The input buffer must hold the declared shape. Decode takes the output
-capacity in elements and checks it and the storage type before writing. Use
-the float or double overload indicated by `info.dtype`. Inspection returns
-owned metadata and section sizes. It works in builds where the stream's core
-is unavailable. Readers can link `qoiw_decode` by itself.
+API reference: [docs/api.md](docs/api.md).
 
-The M1 request defaults to `Tol::none()` for the data bound. Use
-`Tol::abs(...)` or `Tol::rel(...)` to set an explicit constraint. Set
-`options.fixed_bound` to bypass tuning and retain the requested checks.
-The optional compression report records the plan, stored metadata and
-sizes, the number of restored values, the errors after correction, and
-elapsed seconds for each stage.
-Catch `qoiw::Error` and use `code()` to distinguish failures such as an
-undersized output, an unavailable core, or a corrupt stream.
+## Command line
 
-## Verify two fields
-
-Call `qoiw::verify(original, reconstructed, request, threads)` with two
-array views of the same shape and storage type. It resolves relative
-tolerances from the original field and runs without a compressor. The
-returned `Verification` includes the absolute tolerances, per-constraint
-counts, and maximum absolute errors. `ok()` is true when no value violates
-any constraint.
-
-The overall count includes each failing position once. A changed non-finite
-storage value counts under data even with the data bound disabled. If both
-storage values are finite, a changed pair that makes either QoI evaluation
-non-finite counts under that target. A changed finite pair counts under
-`exact_violations` if either value satisfies the exact predicate. Bit-identical
-values pass every check. Maximum errors use pairs with finite operands. A
-difference that overflows is reported as infinity.
-
-When a compression report is requested, its `verification` field measures
-the corrected reconstruction with the same resolved tolerances used by the
-encoder. This additional pass is timed in `seconds.verification`.
-
-The independent checker in `tests/reference/qoi_numpy.py` reads the original
-and decoded raw files and evaluates NumPy formulas supplied by each test.
-From `tests/reference`, a squared-field check looks like this.
-
-```python
-import numpy as np
-from qoi_numpy import Target, Tolerance, check_files
-
-targets = [Target("x^2", np.square, Tolerance("REL", 1e-3))]
-report = check_files("U.f32", "U.out.f32", "<f4", (100, 500, 500), targets)
-assert report["ok"], report
+```
+qoiw compress   (-f|-d) (--shape N[,N...] | -1 .. -4 extents) -i FILE [targets] [-M ...] [-X PRED]
+                [-c CORE] [--core-option NAME=VALUE]... [--fixed-bound B]
+                [--allow-stream-changing-parallelism] [-z FILE] [-a] [-v] [-t N] [--json]
+qoiw decompress -z FILE -o FILE [-t N] [--json]
+qoiw inspect    -z FILE [--json]
+qoiw verify     (-f|-d) (--shape ... | -1 .. -4 ...) -i FILE -o FILE [targets] [-M ...] [-X PRED] [-t N] [--json]
+qoiw cores
 ```
 
-The checker resolves relative bounds from the original field. It checks
-the stored bits for exactness and allows a relative comparison slack of
-`1e-9` on numerical bounds. Use `relative_slack=0` for strict comparisons.
-CTest runs the checker when NumPy is available for its Python interpreter.
+`qoiw <command> --help` prints the same options.
 
-## SZ3 core
+### Raw data
 
-Use `qoiw::get_core("sz3")` to access the adapter and `qoiw::available_cores()`
-to list the cores in a build. Both are available through `qoiw/core.hpp`
-and the `qoiw_decode` library. The adapter accepts C-order float32 and
-float64 fields. `CoreParams::bound` is an absolute error bound, and zero
-requests a lossless stream. Set `params.options["algo"]` to `interp_lorenzo`
-(the default), `interp`, `lorenzo_reg`, or `nopred`.
-
-By default, thread count leaves the core stream byte-identical. To let an
-OpenMP build split the field into chunks, set
-`params.allow_stream_changing_parallelism = true` and request multiple
-threads. A thread count of zero uses the runtime default. A serial build
-can read either stream layout. If the available reader threads are fewer
-than the stored chunks, the adapter uses SZ3's serial chunk decoder.
-
-SZ3 stores its decoding configuration in the core stream. The adapter
-checks its storage type and dimensions against the QoIW field before
-decoding into the caller's buffer. The separate `decode_params` section is
-empty, and the container preserves all singleton axes of the original field.
-
-## Container and lossless corrections
-
-The provisional version 0.0 stream carries C-order dimensions, per-field bounds,
-opaque decode parameters, fingerprint metadata, and one CORE section per field.
-Its request header records each point-wise expression and its resolved absolute
-tolerance. A point-wise record consists of kind byte `0x01`, a little-endian
-float64 tolerance, and the expression text prefixed by its little-endian
-`u16` byte length. The decoder reads the text as metadata.
-The reader checks the header CRC32C before interpreting its contents. It returns
-views into the input buffer for strings and payloads, so callers must retain the
-buffer while using the parsed stream.
-
-A field with corrections also carries one required LOSSLESS section (type
-`0x11`, flags zero). The payload starts with two little-endian `u64` values
-giving the correction count and the compressed byte length of the index frame.
-Two zstd frames follow, each with its uncompressed size recorded. The first
-holds unsigned LEB128 gaps between increasing flat indices, starting with the
-absolute first index. The second holds the corresponding original float32 or
-float64 bit patterns in little-endian order. Fields with zero corrections omit
-the section.
-
-Field decoding first runs the core, then validates the complete correction
-layer and overwrites the selected values. The stored corrected-stream fixture
-checks restoration of negative zero and a specific NaN payload. The original
-M0 fixtures continue to check core-only streams. The format freeze is scheduled
-for M1 and decoded-value fingerprint verification for M3.
-
-The encoder's point-wise pass takes one original field, its core reconstruction
-in the same storage type, compiled target expressions with absolute tolerances,
-and optional data and exact-value constraints. It compares in double precision.
-A changed value needs restoration if it exceeds any bound, either value is
-non-finite, either QoI result is non-finite, or either value satisfies the exact
-condition. The pass applies its serialized corrections to the reconstruction,
-so the encoder sees the same final bits as a reader. The
-`core.pointwise_roundtrip` test checks this for all six mock cores.
-
-## Mock cores
-
-The M0 integration test wraps the output of a test core in an empty-request
-container, then selects the decoder by the stored core name. Run it with
-`ctest --test-dir build -R core.mock_roundtrip --output-on-failure`.
-The adapters build with `QOIW_BUILD_TESTS=ON`.
-
-| Core | Decoded values |
+| Option | Meaning |
 | --- | --- |
-| `mock:identity` | Original IEEE bits, including signed zero and NaN payloads. |
-| `mock:quantizer` | Nearest multiple of twice the bound, with halfway cases rounded away from zero. The stream stores exact bits for exceptional values, out-of-range indices, and reconstructions that would exceed the bound after storage rounding. |
-| `mock:noise` | Alternating positive and negative offsets of `factor * bound`. Set the `factor` core option to a number greater than 1. The default is 2. |
-| `mock:garbage` | Alternating +1 and −1 regardless of input. |
-| `mock:signflip` | Flipped signs where the absolute input value is at most the bound. |
-| `mock:nan` | Quiet NaNs at even flat indices, starting at zero. |
+| `-f`, `--float32` / `-d`, `--float64` | Value type of the raw files. Exactly one is required. |
+| `--shape N[,N...]` | 1 to 4 positive extents in **C order**, slowest-varying first: `--shape 100,500,500` is `a[100][500][500]`. |
+| `-1 nx`, `-2 nx ny`, `-3 nx ny nz`, `-4 nx ny nz nw` | The same shape, **fastest-varying first** (the SZ3 tool's convention): `-3 500 500 100` equals `--shape 100,500,500`. Give either this or `--shape`, not both. |
+| `-i`, `--input FILE` | Original raw file: little-endian values, exactly the product of the extents times 4 or 8 bytes. |
+| `-o`, `--reconstructed FILE` | `verify` only: the reconstructed raw file to check. |
 
-The quantizer golden stream contains a 1 × 4 float32 array compressed at bound
-0.25. Its stored step of 0.5 and signed indices −3, −1, 0, 2 reconstruct
-−1.5, −0.5, 0, 1. The test checks both the wire bytes and these decoded values.
+### Requirements
 
-## Point-wise expressions
-
-Link against `QOIW::qoiw` and include `<qoiw/expr.hpp>` to compile a formula
-once and evaluate it on doubles. For example, `qoiw::Expr f("x < 0 ? 0 : x^2")`
-gives `f.eval(3) == 9`. At the same input, `f.jet(3)` gives first derivative 6
-and second derivative 2. Use `f.eval(input, output, count)` for batches. Input
-and output can be the same array.
-
-The grammar supports comparisons, conditional branches, implicit multiplication
-such as `10x`, and the constants `pi`, `e`, `nan`, and `inf`. Powers associate
-to the right. `round` rounds halfway cases away from zero. The jet fields
-`dist` and `brk` give local estimates of the distance in `x` to a singularity
-and a breakpoint, respectively. A positive infinity indicates that the
-analysis found no such boundary. The compiler supports 64 levels of syntax
-nesting, 512 levels in the folded syntax tree, and 64 evaluation stack slots.
-
-The parser, bytecode evaluation, differentiation, and reference tests are
-adapted from public QPET commit `a80e6861fc15e7a66eb1f36b6172911a541b9d3c`.
-[QPET BSD 3-Clause license](LICENSES/QPET.txt)
-
-### Resolving point-wise tolerances
-
-Frontend step F0 scans the original field and computes each relative tolerance
-as its specified fraction times the finite range of that target. A relative
-data bound uses the range of the input itself. Absolute tolerances pass through
-directly. If a range is constant or contains no eligible values, the specified
-fraction becomes the absolute tolerance.
-
-An exact condition such as `x > 1e30` excludes fill values from every range.
-NaN and infinite inputs are also excluded. At a finite, unmasked input where
-one expression is undefined, the other targets still contribute their finite
-values to their own ranges. F0 marks that input for exact preservation.
-
-### Estimating candidate bounds
-
-Frontend step F1 samples the field at a regular stride, targeting about
-1,048,576 values by default. At each sampled value it uses each expression's
-first and second derivatives to estimate an allowable error in the input.
-It probes just across a breakpoint to see whether the jump fits the tolerance.
-It checks both endpoints and shrinks the estimate when either endpoint is
-undefined or exceeds the tolerance. The smallest estimate
-across targets is capped by the data range and any active data bound.
-
-Exact samples contribute zeros to the sorted distribution. Positive distinct
-quantiles supply the initial compressor bounds for tuning. If all requested
-quantiles select zero, the first positive sampled radius supplies a candidate
-when available. The backend checks the actual decoded field for every selected
-bound. The estimator and default quantiles follow the pinned public QPET
-implementation. [QPET license](LICENSES/QPET.txt)
-
-### Selecting a bound without trial compression
-
-Frontend step F2 can supply a compressor bound in three cases.
-
-| Condition | Bound sent to the core |
+| Option | Meaning |
 | --- | --- |
-| The caller fixes a finite, nonnegative bound. | Use that value, including zero, and skip the prior. Fixed-bound experiments can exceed the resolved data bound. The backend still enforces that data bound on the decoded field. |
-| Every sampled radius is zero. | Use one billionth of the finite input range, or 1 for a constant or absent range. A positive range gives at least the smallest positive `double`. Any active data bound caps the result. |
-| A strict absolute-error core has a single candidate and all constraints are affine. | Use the candidate. A data bound on its own qualifies. An exact-value predicate requires measurement. |
+| `-q`, `--qoi EXPR` | Starts a point-wise target, a function of `x` such as `'x^2'`, `'ln(x)'`, `'x > 273.15 ? 1 : 0'`. Repeat for several targets; all must hold. Syntax: [docs/expressions.md](docs/expressions.md). |
+| `-m`, `--tolerance ABS V` / `REL F` | Required once after each `-q`, for that target: an absolute tolerance `V`, or a fraction `F` of the QoI's value range over the input. Values are finite and nonnegative. |
+| `-M`, `--data-bound ABS V` / `REL F` / `NONE` | Bound on `\|x - x'\|` for every value; `REL` is a fraction of the data's value range. Default `NONE`. |
+| `-X`, `--exact PRED` | Values where the predicate is non-zero (e.g. `'x > 1e30'` for fill values) are reproduced bit for bit. NaN and infinite values always are. |
 
-Other requests retain the prior and its candidates for measured tuning.
-Every path returns the resolved request for full-field verification.
+Relative values use the range over finite values outside the exact
+predicate. A constant or empty range makes the fraction an absolute value.
 
-### Sampling blocks for measured tuning
+### Compression and output
 
-F3 selects blocks from the original field in C order. The default sampling
-rate is 1%. Each dimension is divided into nearly equal tiles, and a Halton
-sequence selects tile coordinates using bases 2, 3, 5, and 7. The last tile
-shifts back when necessary to fit a full block. Block order is deterministic
-across thread counts.
+| Option | Meaning |
+| --- | --- |
+| `-c`, `--core NAME` | Compressor; `sz3` (default). `qoiw cores` lists what the build has. |
+| `--core-option NAME=VALUE` | Option for the core. SZ3: `algo=interp_lorenzo` (default), `interp`, `lorenzo_reg` or `nopred`. |
+| `--fixed-bound B` | Give the core this absolute bound instead of tuning one. All requirements are still enforced. |
+| `--allow-stream-changing-parallelism` | Let SZ3 use its chunked OpenMP mode, whose stream depends on the thread count. |
+| `-z`, `--stream FILE` | Container to write (`compress`) or read. Without it, `compress` only measures. |
+| `-o`, `--output FILE` | `decompress`: raw file to write, little-endian, C order. |
+| `-a`, `--verify` | `compress`: decode the finished container and check it again before writing. |
+| `-v`, `--verbose` | `compress`: print every bound the tuner measured. |
+| `-t`, `--threads N` | Threads; default 1, `0` uses the OpenMP default. |
+| `--json` | Print a JSON report instead of text. |
 
-| Field rank | Default block edge | Minimum edge | Block count |
-| --- | ---: | ---: | ---: |
-| 1 | 262144 | 262144 | 5–64 |
-| 2 | 512 | 128 | 12–64 |
-| 3 | 64 | 64 | 5–64 |
-| 4 | 24 | 24 | 5–64 |
+### Exit status
 
-If the planned blocks would cover at least half the input by element count,
-F3 copies the whole field as a single block and records that choice. The
-sample owns the original float32 or float64 bits. On the Hurricane reference
-field of shape `100 × 500 × 500`, the defaults select five `50 × 63 × 63` blocks,
-matching QPET's locations and all 992,250 sampled values. [QPET license](LICENSES/QPET.txt)
+`0` success; `2` a requirement is violated (`compress` then writes nothing);
+`1` an argument, file or processing error. Report fields and file handling:
+[docs/cli.md](docs/cli.md).
 
-### Measuring candidate costs
+## Licences
 
-For each candidate bound, F4 compresses and decompresses every sample block
-with one core thread per call. It runs the point-wise backend on a copy of the
-reconstruction and counts the encoded lossless bytes. The core byte count
-includes the stream and any decode parameters. Repeating a bound reuses the
-measurement and raw decoded blocks from that search.
-
-The estimated cost in bytes per value combines the core bytes and the
-correction bytes. F4 weights the corrections by the fraction of sensitive
-points in the full-field prior divided by their fraction in the blocks. A
-point is sensitive when its estimated radius is strictly below the candidate
-bound. If both fractions are zero, the measured corrections retain unit
-weight. Whole-field samples also retain unit weight.
-
-If the input fraction exceeds 20 times the block fraction, F4 estimates the
-correction cost as `rare_outlier_share × input fraction × (bytes per value + 1)`.
-The default share is 0.1. For cores that declare a fixed cost per call, F4
-compresses a constant block at the same shape and bound to estimate overhead
-on multi-block samples. Each deduction is capped at the measured bytes of that
-block. The measurement retains the raw byte counts alongside its estimate.
-
-### Selecting the point-wise bound
-
-F5 measures the positive prior candidates, then refines around the cheapest
-one for up to four rounds. Each round measures the geometric midpoints to its
-neighbours. Refinement stops when the upper bound is within 5% of the lower
-bound or the interval cannot shrink further.
-
-The default choice is the smallest tried candidate within 2.5% of the lowest
-eligible cost. The frontend also probes an active data bound. If that probe
-needs zero restorations, the data bound joins the candidate set and takes
-precedence within the same cost band. A probe needing corrections can still
-compete if the prior or refinement independently proposes it. Strict cores
-measure only bounds at or below the data bound.
-
-The search returns the selected bound and the scalar F4 statistics for each
-distinct trial in measurement order. An F2 shortcut returns its bound with
-an empty trace.
-
-### Reading a point-wise plan
-
-`qoiw::Plan` owns its data. Use `plan.bound[0]` for the field's core call and
-`plan.to_json()` to export the report. M1 uses lossless corrections, so the
-selected bound also serves as `reference_bound`. The report includes the
-absolute data bound, each target's expression and absolute tolerance, and the
-exact predicate when supplied.
-
-For a measured search, `predicted` gives core and correction bytes per input
-value and their sum. The indicative compression ratio divides the storage
-width by that sum and is absent for a zero cost estimate. The predicted
-outlier share is the sample's restored fraction times its correction weight,
-capped at one. When the selected trial uses the rare-outlier fallback, the
-estimate is the configured rare-outlier share times the sensitive input
-fraction. Each trace entry retains the raw counts and its own fallback flag.
-
-Sample PSNR uses the full finite, unmasked input range and the mean squared
-error of the corrected blocks over their finite, unmasked original values.
-JSON uses `"+inf"` for a perfect reconstruction, `"-inf"` for a zero range
-with positive error, and `null` when no sample values qualify.
-
-`binding` records how F5 chose the bound. A data-only request or a selected
-data cap gives `DATA_BOUND`. If the clean cap won over a strictly cheaper,
-tighter QoI candidate inside the tie band, the result is `TIE`. A QoI or
-exact predicate that selects a different bound gives `QOI`. The same
-cap comparison applies to a single affine candidate. A fixed bound, a
-zero-radius fallback, or a request without constraints has no binding label.
-
-A shortcut records its reason, an empty trace and a null prediction.
-`whole_input_sampled` describes the blocks actually measured,
-`rare_outlier_fallback` describes the selected trial, and `prior_free`
-is false for the M1 point-wise algorithm.
-
-## Reference benchmarks
-
-The M0 benchmark guide gives the pinned QPET build, the independently checked
-Hurricane result, and the field inventory for parity testing. [Reference baseline](bench/reference/README.md)
-
-The M1 harness measures SZ3 tuning regret and compares QoIW with pinned
-QPET across the 20 reference cases. [Regret benchmark](bench/regret/README.md)
-
-The performance run measures the same cases against plain SZ3 at identical
-bounds. [M1 timing and memory](bench/regret/PERFORMANCE.md)
+QoIW adapts its expression engine and tuning from public QPET
+([BSD 3-Clause](LICENSES/QPET.txt)) and bundles CLI11 v2.7.2
+([licence](LICENSES/CLI11.txt)). SZ3 is a submodule under its own licence.
