@@ -18,4 +18,9 @@ StreamInfo inspect(Bytes stream);
 void decompress(Bytes stream, float* out, std::size_t capacity, int threads = 1);
 void decompress(Bytes stream, double* out, std::size_t capacity, int threads = 1);
 
+// Check two fields of the same shape and storage type. Resolve relative
+// tolerances on the original field. Neither input is modified.
+Verification verify(const ArrayView& original, const ArrayView& reconstructed, const Request& request = {},
+                    int threads = 1);
+
 }  // namespace qoiw
