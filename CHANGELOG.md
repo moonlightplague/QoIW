@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### M1 guarantee matrix
+
+- Cross both storage types and the enabled cores with nine synthetic field families and 32 point-wise expressions. Check empirical bounds, stored tolerances, and thread-independent container and reconstruction bytes.
+- Add a test probe that runs the integrated encoder with SZ3 or a mock core and compares the checked reconstruction with a decode from the saved container.
+
 ### M1 independent NumPy checker
 
 - Run independent checks on fresh float32 and float64 CLI decodes in CI, including a changed value that makes a QoI non-finite.

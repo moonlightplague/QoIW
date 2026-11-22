@@ -1,4 +1,4 @@
-#include "qoiw/qoiw.hpp"
+#include "pipeline/compress_field.hpp"
 
 #include <chrono>
 #include <new>
@@ -41,7 +41,8 @@ auto call_core(Work work) {
 template <class T>
 backend::PointCorrections correct_field(const Core& core, const CoreOutput& payload, const ArrayView& input,
                                         std::size_t bytes, const ResolvedPointRequest& request, int threads,
-                                        CompressionTimes& timings, Verification* verification) {
+                                        CompressionTimes& timings, Verification* verification,
+                                        std::vector<std::uint8_t>* verified) {
     auto start = Clock::now();
     std::vector<T> decoded(bytes / sizeof(T));
     call_core([&] {
@@ -56,15 +57,20 @@ backend::PointCorrections correct_field(const Core& core, const CoreOutput& payl
         *verification = backend::verify_pointwise(input.dtype, input.data, decoded.data(), bytes, request, threads);
         timings.verification = seconds_since(start);
     }
+    if (verified) {
+        const auto* begin = reinterpret_cast<const std::uint8_t*>(decoded.data());
+        verified->assign(begin, begin + bytes);
+    }
     return corrections;
 }
 }  // namespace
 
-std::vector<std::uint8_t> compress(const ArrayView& input, const Request& request, const Options& options,
-                                   Report* report) try {
+std::vector<std::uint8_t> pipeline::compress_field(const ArrayView& input, const Request& request, const Options& options,
+                                                 Report* report, const Core* supplied_core,
+                                                 std::vector<std::uint8_t>* verified) try {
     const auto bytes = common::array_bytes(input.dtype, input.dims);
     if (!input.data || !bytes || options.threads < 0) throw std::invalid_argument("invalid input or thread count");
-    const Core& core = resolve_core(options);
+    const Core& core = supplied_core ? *supplied_core : resolve_core(options);
     if (!core.supports(input.dtype, input.dims))
         throw Error(ErrorCode::Unsupported, "core does not support the input type or shape");
 
@@ -92,8 +98,8 @@ std::vector<std::uint8_t> compress(const ArrayView& input, const Request& reques
     result.seconds.core_encode = seconds_since(start);
     auto* verification = report ? &result.verification : nullptr;
     auto corrections = input.dtype == DType::Float32
-        ? correct_field<float>(core, payload, input, bytes, resolved, params.threads, result.seconds, verification)
-        : correct_field<double>(core, payload, input, bytes, resolved, params.threads, result.seconds, verification);
+        ? correct_field<float>(core, payload, input, bytes, resolved, params.threads, result.seconds, verification, verified)
+        : correct_field<double>(core, payload, input, bytes, resolved, params.threads, result.seconds, verification, verified);
     result.restored = corrections.restored;
 
     start = Clock::now();
@@ -126,6 +132,11 @@ std::vector<std::uint8_t> compress(const ArrayView& input, const Request& reques
     throw Error(ErrorCode::InvalidArgument, error.what());
 } catch (const std::exception& error) {
     throw Error(ErrorCode::Internal, error.what());
+}
+
+std::vector<std::uint8_t> compress(const ArrayView& input, const Request& request, const Options& options,
+                                   Report* report) {
+    return pipeline::compress_field(input, request, options, report);
 }
 
 }  // namespace qoiw
