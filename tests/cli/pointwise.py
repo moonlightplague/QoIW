@@ -73,7 +73,7 @@ def round_trip_f64(root):
     options = ["--input", raw, "--float64", "--shape", "3,4,8", "--qoi", "x^2",
                "--tolerance", "abs", ".001", "--data-bound", "NONE", "--verbose"]
     assert "Trial bound=" in cli("compress", *options)
-    result = read_json("compress", *options, "--stream", blob, "--verify")
+    result = read_json("compress", *options, f"--stream={blob}", "-av")
     report = result["report"]
     assert report["stream"]["shape"] == [3, 4, 8] and report["stream"]["dtype"] == "float64"
     assert report["plan"]["trace"] and result["post_decode"]["ok"]
@@ -100,6 +100,9 @@ def malformed_inputs(root):
     cli(*verify, "--shape", "1", "-m", "ABS", "1", status=1)
     cli(*verify, "--shape", "1", "-q", "x", status=1)
     cli(*verify, "--shape", "1", "-q", "x", "-m", "ABS", "nan", status=1)
+    cli(*verify, "--shape", "1", "-M", "ABS", status=1)
+    cli(*verify, "--shape", "1", "-M", "NONE", "1", status=1)
+    assert read_json(*verify, "--shape=1", "-M", "ABS", biggest, "-M", "NONE")["data_bound_abs"] is None
     cli(*verify, "--shape", "1", "-t", "-1", status=1)
     cli(*verify, "--shape", "1", "-z", "stream.qoiw", status=1)
     broken.write_bytes(b"QOIW")
@@ -108,8 +111,9 @@ def malformed_inputs(root):
     assert decoded.read_bytes() == struct.pack("<d", -biggest)
 
 
-assert "Usage" in cli("--help")
-assert "Usage" in cli("verify", "--help")
+assert "SUBCOMMANDS" in cli("--help")
+verify_help = cli("verify", "--help")
+assert "qoiw verify" in verify_help and "--reconstructed" in verify_help
 cli("unknown", "--help", status=1)
 golden = Path(sys.argv[3])
 assert read_json("inspect", "-z", golden)["shape"] == [16, 32]
