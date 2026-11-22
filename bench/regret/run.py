@@ -251,7 +251,9 @@ def compare_case(args, case, builds):
         return {key: value for key, value in row.items() if key not in ("commands", "load_average")}
 
     return {
-        "case": case.name, "qoi_abs": qoi_abs, "data_abs": data_abs,
+        "case": case.name, "shape": list(case.shape), "expression": case.qoi,
+        "source": config["source"], "builds": builds, "threads": args.threads,
+        "qoi_abs": qoi_abs, "data_abs": data_abs,
         "qoiw": summary(tuned), "qpet": summary(baseline), "oracle": summary(oracle),
         "oracle_trials": len(trials),
         "parity_ratio": tuned["bytes"] / baseline["bytes"],

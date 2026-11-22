@@ -64,3 +64,6 @@ and reads both ends. It exits unsuccessfully if any selected file fails.
 The M0 run verified 106 files, including the three converted Miranda fields.
 The eight JHTDB fields for steps 0500 and 5000 await read access on this machine.
 All inputs for the 20 M1 regret cases passed the inventory check.
+
+Use the same data root and reference build for the
+[M1 regret and parity benchmark](../regret/README.md).
