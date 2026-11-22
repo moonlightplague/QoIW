@@ -4,6 +4,7 @@
 
 ### M1 command-line interface
 
+- Test the CLI on float32 and float64 files, including exact values, independent checks, malformed arguments, and safe output publication. Document the command workflow and exit statuses.
 - Add the `qoiw` executable with compression, decompression, inspection, point-wise verification and core listing. Accept C-order or legacy dimensions and emit text or JSON reports.
 
 ### M1 point-wise verification

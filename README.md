@@ -32,7 +32,8 @@ cmake --build build --parallel
 | `QOIW_SZ3_SOURCE_DIR=/path/to/SZ3` | Use a compatible SZ3 source checkout. |
 | `QOIW_SZ3_USE_INSTALLED=ON` | Find the SZ3 3.4 CMake package. Use `CMAKE_PREFIX_PATH` for a custom install prefix. |
 | `QOIW_FETCH_DEPS=ON` | Fetch zstd 1.5.6 for the correction layer if system zstd is unavailable. |
-| `QOIW_BUILD_TESTS=OFF` | Build only the libraries. |
+| `QOIW_BUILD_TOOLS=OFF` | Skip the `qoiw` command-line tool. |
+| `QOIW_BUILD_TESTS=OFF` | Skip the tests. |
 | `QOIW_WARNINGS_AS_ERRORS=ON` | Treat QoIW warnings as errors under GCC and Clang. |
 | `QOIW_SANITIZE=address`, `undefined`, or `thread` | Instrument a build with one sanitizer. The default is `none`. |
 
@@ -46,6 +47,39 @@ The common tests use known byte sequences and the CRC32C check value for
 and multi-field round trips. The SZ3 tests exercise both storage types and
 ranks 1 through 4. A stored two-chunk stream checks that OpenMP and serial
 builds reproduce the same corrected float32 values.
+
+## Command line
+
+The default build produces `build/qoiw`. The CLI reads and writes files of
+little-endian float32 or float64 values in C order. For a field with shape
+`100,500,500`, use the following commands.
+
+```sh
+build/qoiw compress -f --shape 100,500,500 -i U.f32 -q 'x^2' -m REL 1e-3 -z U.qoiw -a -v
+build/qoiw inspect -z U.qoiw --json
+build/qoiw decompress -z U.qoiw -o U.out.f32
+build/qoiw verify -f --shape 100,500,500 -i U.f32 -o U.out.f32 -q 'x^2' -m REL 1e-3
+build/qoiw cores
+```
+
+Use `-d` for float64. The legacy form `-3 500 500 100` takes extents in
+fastest-varying-first order. Choose one shape form per command. Each
+`-q` starts a point-wise target and takes one `-m ABS value` or
+`-m REL fraction`. Use `-M` to set the data bound and `-X` to set an
+exact predicate. Run `build/qoiw --help` for the long options.
+
+Compression with `-a` decodes and verifies the finished stream before
+publishing the output. Omit `-z` to measure compression without saving
+a container. The CLI stages completed outputs beside the destination and
+rejects attempts to write over the input. Exit status 0 means success,
+2 means a verification constraint failed, and 1 means an argument,
+file, or processing error.
+
+Use `-v` for the search trace. With `--json`, compression emits the full
+`report`, including the plan and trace, and `post_decode` contains the
+fresh verification result when `-a` is set. `inspect` and `decompress`
+emit stream metadata with `--json`, and `verify` emits the verification
+result.
 
 ## Compress and decompress a field
 

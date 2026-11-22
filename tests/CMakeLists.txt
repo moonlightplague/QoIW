@@ -120,4 +120,9 @@ find_package(Python3 QUIET COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
     add_test(NAME frontend.plan_json COMMAND Python3::Interpreter
         "${CMAKE_CURRENT_SOURCE_DIR}/unit/frontend/plan_json.py" $<TARGET_FILE:qoiw_test_plan>)
+    if(QOIW_BUILD_TOOLS)
+        add_test(NAME cli.pointwise COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/cli/pointwise.py"
+            $<TARGET_FILE:qoiw_cli> $<BOOL:${QOIW_CORE_SZ3}> "${CMAKE_CURRENT_SOURCE_DIR}/golden/m1-sz3-chunked.qoiw")
+        set_tests_properties(cli.pointwise PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=4;OMP_DYNAMIC=FALSE")
+    endif()
 endif()
