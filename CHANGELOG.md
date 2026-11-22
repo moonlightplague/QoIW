@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Technical documentation
+
+- Add `docs/` with pages on the architecture, building, the C++ API, CLI reports, expressions, the frontend (F0 to F6), the backend and LOSSLESS layer, the container format, cores, and testing, written against the current code and listing what the plan has not implemented yet.
+- Reduce the README to the build, a quick start and the command-line input specification.
+- Move the benchmark runbooks from `bench/` to `docs/benchmarks/` and update their links.
+
 ### M1 performance benchmark
 
 - Record the 120 timing pairs and peak RSS results, including the one-thread compression and frontend misses and the SCALE decode outlier.
