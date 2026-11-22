@@ -11,10 +11,10 @@ namespace qoiw {
 namespace {
 std::string number(double value) {
     if (std::isinf(value)) return value > 0 ? "\"+inf\"" : "\"-inf\"";
-    if (std::isnan(value)) throw std::invalid_argument("unexpected NaN in plan");
+    if (std::isnan(value)) throw std::invalid_argument("unexpected NaN in report");
     char buffer[64];  // Shortest round-trippable decimal for a binary64.
     const auto result = std::to_chars(buffer, buffer + sizeof(buffer), value);
-    if (result.ec != std::errc{}) throw std::logic_error("cannot format plan number");
+    if (result.ec != std::errc{}) throw std::logic_error("cannot format report number");
     return {buffer, result.ptr};
 }
 
@@ -86,6 +86,16 @@ void write_trial(std::ostream& out, const CandidateStats& t) {
         << ",\"bytes_per_value\":" << number(t.bytes_per_value)
         << ",\"sample_psnr_db\":" << number(t.sample_psnr_db) << '}';
 }
+
+void write_errors(std::ostream& out, const ErrorStats& stats) {
+    out << "{\"max_abs_error\":" << number(stats.max_abs_error)
+        << ",\"violations\":" << stats.violations
+        << ",\"nonfinite_violations\":" << stats.nonfinite_violations << '}';
+}
+
+void write_tolerance(std::ostream& out, const TargetTolerance& target) {
+    out << "\"expression\":" << quote(target.expression) << ",\"tolerance_abs\":" << number(target.tolerance_abs);
+}
 }  // namespace
 
 std::string Plan::to_json() const {
@@ -102,8 +112,9 @@ std::string Plan::to_json() const {
         << ",\"exact_condition\":" << (exact_condition ? quote(*exact_condition) : "null") << ",\"targets\":[";
     for (std::size_t i = 0; i < targets.size(); ++i) {
         if (i) out << ',';
-        out << "{\"expression\":" << quote(targets[i].expression)
-            << ",\"tolerance_abs\":" << number(targets[i].tolerance_abs) << '}';
+        out << '{';
+        write_tolerance(out, targets[i]);
+        out << '}';
     }
     out << "],\"predicted\":";
     if (predicted) write_prediction(out, *predicted);
@@ -117,6 +128,67 @@ std::string Plan::to_json() const {
         << ",\"prior_free\":" << flags.prior_free << ",\"rare_outlier_fallback\":" << flags.rare_outlier_fallback
         << ",\"shortcut_taken\":" << flags.shortcut_taken << '}'
         << ",\"shortcut_reason\":" << (shortcut_reason ? quote(label(*shortcut_reason)) : "null") << '}';
+    return out.str();
+}
+
+std::string Verification::to_json() const {
+    std::ostringstream out;
+    out.imbue(std::locale::classic());
+    out << std::boolalpha << "{\"ok\":" << ok() << ",\"values\":" << values
+        << ",\"violating_values\":" << violating_values << ",\"exact_violations\":" << exact_violations
+        << ",\"data_bound_abs\":" << number(data_bound_abs) << ",\"data\":";
+    write_errors(out, data);
+    out << ",\"targets\":[";
+    for (std::size_t i = 0; i < targets.size(); ++i) {
+        if (i) out << ',';
+        out << '{';
+        write_tolerance(out, targets[i].target);
+        out << ",\"errors\":";
+        write_errors(out, targets[i].errors);
+        out << '}';
+    }
+    out << "]}";
+    return out.str();
+}
+
+std::string StreamInfo::to_json() const {
+    std::ostringstream out;
+    out.imbue(std::locale::classic());
+    out << "{\"dtype\":" << quote(dtype == DType::Float32 ? "float32" : "float64") << ",\"shape\":[";
+    for (std::size_t i = 0; i < dims.size(); ++i) {
+        if (i) out << ',';
+        out << dims[i];
+    }
+    out << "],\"num\":" << num << ",\"stream_bytes\":" << stream_bytes << ",\"wrapper_version\":" << quote(wrapper_version)
+        << ",\"core_name\":" << quote(core_name) << ",\"core_version\":" << quote(core_version)
+        << ",\"core_format_version\":" << quote(core_format_version) << ",\"fields\":[";
+    for (std::size_t i = 0; i < fields.size(); ++i) {
+        if (i) out << ',';
+        const auto& field = fields[i];
+        out << "{\"name\":" << quote(field.name) << ",\"bound\":" << number(field.bound)
+            << ",\"data_bound_abs\":" << number(field.data_bound_abs) << ",\"decode_params_bytes\":" << field.decode_params_bytes
+            << ",\"core_bytes\":" << field.core_bytes << ",\"lossless_bytes\":" << field.lossless_bytes << '}';
+    }
+    out << "],\"targets\":[";
+    for (std::size_t i = 0; i < targets.size(); ++i) {
+        if (i) out << ',';
+        out << '{';
+        write_tolerance(out, targets[i]);
+        out << '}';
+    }
+    out << "],\"exact_condition\":" << (exact_condition ? quote(*exact_condition) : "null") << '}';
+    return out.str();
+}
+
+std::string Report::to_json() const {
+    std::ostringstream out;
+    out.imbue(std::locale::classic());
+    out << "{\"plan\":" << plan.to_json() << ",\"stream\":" << stream.to_json()
+        << ",\"nonfinite_inputs\":" << nonfinite_inputs << ",\"restored\":" << restored
+        << ",\"verification\":" << verification.to_json() << ",\"seconds\":{\"planning\":" << number(seconds.planning)
+        << ",\"core_encode\":" << number(seconds.core_encode) << ",\"core_decode\":" << number(seconds.core_decode)
+        << ",\"correction\":" << number(seconds.correction) << ",\"verification\":" << number(seconds.verification)
+        << ",\"container\":" << number(seconds.container) << "}}";
     return out.str();
 }
 
