@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <numeric>
 #include <stdexcept>
 #include <utility>
 
@@ -21,14 +23,49 @@ std::size_t payload_bytes(const CoreOutput& output) {
     return output.stream.size() + output.decode_params.size();
 }
 
+// Sum of squares in units of 2^(2*exponent). Even a single binary64
+// difference can exceed the finite range, or underflow when squared.
+struct ErrorSquares {
+    double sum = 0;
+    int exponent = 0;
+
+    void merge(ErrorSquares other) {
+        if (other.sum == 0) return;
+        if (sum == 0 || other.exponent > exponent) std::swap(*this, other);
+        sum += std::ldexp(other.sum, 2 * (other.exponent - exponent));
+    }
+
+    void add(double a, double b) {
+        if (a == b || !std::isfinite(a)) return;
+        double error = a - b;
+        const bool overflow = !std::isfinite(error);
+        if (overflow) error = .5 * a - .5 * b;
+        int power;
+        const double fraction = std::frexp(error, &power);
+        merge({fraction * fraction, power + overflow});
+    }
+
+    std::optional<double> psnr(const std::optional<Range>& range, std::size_t count) const {
+        if (!count || !range) return {};
+        if (sum == 0) return std::numeric_limits<double>::infinity();
+        if (range->min == range->max) return -std::numeric_limits<double>::infinity();
+        const double span = range->max - range->min;
+        const double log_peak = std::isfinite(span) ? std::log2(span) : 1 + std::log2(range->scaled_width(.5));
+        const double log_rmse = exponent + .5 * std::log2(sum / count);
+        return 20 * std::log10(2.) * (log_peak - log_rmse);
+    }
+};
+
 struct BlockCounts {
     std::size_t core, lossless, restored;
+    ErrorSquares error;
 };
 
 template <class T>
 void measure_blocks(const std::vector<std::vector<T>>& blocks, const std::vector<std::uint64_t>& dims, DType dtype,
                     const Core& core, const CoreParams& params, const CoreTraits& traits,
-                    const ResolvedPointRequest& request, int threads, CandidateMeasurement& result) {
+                    const PointResolution& resolved, std::size_t quality_values, int threads,
+                    CandidateMeasurement& result) {
     const auto values = blocks.front().size();
     const auto bytes = values * sizeof(T);
     std::vector<BlockCounts> counts(blocks.size());
@@ -41,8 +78,10 @@ void measure_blocks(const std::vector<std::vector<T>>& blocks, const std::vector
         core.decompress({payload.stream.data(), payload.stream.size()},
                         {payload.decode_params.data(), payload.decode_params.size()}, dtype, dims, 1, raw.data(), bytes);
         auto verified = raw;
-        const auto patch = backend::correct_pointwise(dtype, original, verified.data(), bytes, request, 1);
-        counts[k] = {payload_bytes(payload), patch.lossless.size(), patch.restored};
+        const auto patch = backend::correct_pointwise(dtype, original, verified.data(), bytes, resolved.request, 1);
+        counts[k] = {payload_bytes(payload), patch.lossless.size(), patch.restored, {}};
+        // Finite exact values already have zero error after correction.
+        for (std::size_t i = 0; i < values; ++i) counts[k].error.add(original[i], verified[i]);
     });
 
     std::size_t overhead = 0;
@@ -53,12 +92,15 @@ void measure_blocks(const std::vector<std::vector<T>>& blocks, const std::vector
         const std::vector<T> flat(values, std::isfinite(first) ? first : T{});
         overhead = payload_bytes(core.compress(flat.data(), dtype, dims, params));
     }
+    ErrorSquares error;
     for (const auto& block : counts) {
         result.core_bytes += block.core;
         result.overhead_bytes += std::min(overhead, block.core);
         result.lossless_bytes += block.lossless;
         result.restored += block.restored;
+        error.merge(block.error);
     }
+    result.sample_psnr_db = error.psnr(resolved.data_range, quality_values);
     result.sample_values = values * blocks.size();
     result.decoded = std::move(decoded);
 }
@@ -66,7 +108,7 @@ void measure_blocks(const std::vector<std::vector<T>>& blocks, const std::vector
 
 PointMeasurer::PointMeasurer(const Core& core, const PointResolution& resolved, const PointSearch& search,
                              CoreParams params, double rare_outlier_share)
-    : core_(core), request_(resolved.request), search_(search), params_(std::move(params)),
+    : core_(core), resolved_(resolved), search_(search), params_(std::move(params)),
       threads_(params_.threads), rare_outlier_share_(rare_outlier_share) {
     if (threads_ < 0 || !(rare_outlier_share >= 0 && rare_outlier_share <= 1) || search.prior.sorted_radii.empty())
         throw std::invalid_argument("invalid candidate measurement options or prior");
@@ -76,6 +118,15 @@ PointMeasurer::PointMeasurer(const Core& core, const PointResolution& resolved, 
     params_.threads = 1;
     if (search.sample.layout.whole_input_sampled) search.sample.values_per_block();
     else block_radii_ = estimate_block_radii(search.sample, resolved, threads_);
+    std::visit([&](const auto& blocks) {
+        std::vector<std::size_t> kept(blocks.size());
+        common::parallel_for(blocks.size(), threads_, [&](std::size_t k) {
+            kept[k] = std::count_if(blocks[k].begin(), blocks[k].end(), [&](double x) {
+                return std::isfinite(x) && !(resolved.request.exact && resolved.request.exact->eval(x) != 0);
+            });
+        });
+        quality_values_ = std::accumulate(kept.begin(), kept.end(), std::size_t{0});
+    }, search.sample.blocks);
 }
 
 const CandidateMeasurement& PointMeasurer::measure(double bound) {
@@ -88,7 +139,8 @@ const CandidateMeasurement& PointMeasurer::measure(double bound) {
     params_.bound = bound;
     const auto& sample = search_.sample;
     std::visit([&](const auto& blocks) {
-        measure_blocks(blocks, sample.layout.dims, sample.dtype(), core_, params_, traits_, request_, threads_, result);
+        measure_blocks(blocks, sample.layout.dims, sample.dtype(), core_, params_, traits_, resolved_,
+                       quality_values_, threads_, result);
     }, sample.blocks);
 
     result.input_sensitive_share = share_below(search_.prior.sorted_radii, bound);
