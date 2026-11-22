@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### M1 command-line interface
+
+- Add the `qoiw` executable with compression, decompression, inspection, point-wise verification and core listing. Accept C-order or legacy dimensions and emit text or JSON reports.
+
 ### M1 point-wise verification
 
 - Include verification of the corrected reconstruction in compression reports and check the diagnostics against independent scalar expectations across SZ3 and all six mock cores.

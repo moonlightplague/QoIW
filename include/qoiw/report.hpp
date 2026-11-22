@@ -68,6 +68,7 @@ struct Verification {
     std::vector<TargetVerification> targets;  // Request order.
 
     bool ok() const noexcept { return violating_values == 0; }
+    std::string to_json() const;
 };
 
 struct Plan {
@@ -105,6 +106,8 @@ struct StreamInfo {
     std::vector<FieldInfo> fields;
     std::vector<TargetTolerance> targets;
     std::optional<std::string> exact_condition;
+
+    std::string to_json() const;
 };
 
 struct CompressionTimes {
@@ -119,6 +122,8 @@ struct Report {
     std::size_t restored = 0;
     CompressionTimes seconds;
     Verification verification;  // On the corrected reconstruction.
+
+    std::string to_json() const;
 };
 
 }  // namespace qoiw
