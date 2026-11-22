@@ -4,6 +4,7 @@
 
 ### M1 guarantee matrix
 
+- Keep the small matrix in regular CTest runs and select the expanded field and target cross product for scheduled Release builds.
 - Cross both storage types and the enabled cores with nine synthetic field families and 32 point-wise expressions. Check empirical bounds, stored tolerances, and thread-independent container and reconstruction bytes.
 - Add a test probe that runs the integrated encoder with SZ3 or a mock core and compares the checked reconstruction with a decode from the saved container.
 

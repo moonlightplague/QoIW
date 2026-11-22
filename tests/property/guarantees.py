@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from typing import Optional
 
 try:
     import numpy as np
@@ -64,8 +65,8 @@ MOCKS = ("identity", "quantizer", "noise", "garbage", "signflip", "nan")
 @dataclass(frozen=True)
 class Policy:
     tolerance: Tolerance
-    data_bound: Tolerance | None
-    fixed_bound: float | None = None
+    data_bound: Optional[Tolerance]
+    fixed_bound: Optional[float] = None
 
 
 POLICIES = {
@@ -112,7 +113,7 @@ def make_field(name, dtype, shape):
         point = dtype.type(88.16)
         lower = np.nextafter(point, dtype.type(-np.inf))
         upper = np.nextafter(point, dtype.type(np.inf))
-        values = np.resize([lower, point, upper, -0., -.5, .5, 1.2, math.nextafter(1.2, 2.), .05, 1.], n)
+        values = np.resize([lower, point, upper, -0., -.5, .5, 1.2, np.nextafter(1.2, 2.), .05, 1.], n)
 
     values = values.astype(dtype)
     if name == "nonfinite":
