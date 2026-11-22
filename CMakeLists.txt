@@ -12,6 +12,7 @@ add_library(qoiw_decode STATIC
     src/core/builtin.cpp
     src/container/reader.cpp
     src/backend/lossless_apply.cpp
+    src/pipeline/decompress.cpp
     src/pipeline/decode_field.cpp)
 target_link_libraries(qoiw_decode PRIVATE ${QOIW_ZSTD_TARGET})
 target_include_directories(qoiw_decode PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
@@ -37,7 +38,8 @@ add_library(qoiw STATIC
     src/frontend/plan.cpp
     src/frontend/report.cpp
     src/frontend/sample.cpp
-    src/frontend/search.cpp)
+    src/frontend/search.cpp
+    src/pipeline/compress.cpp)
 add_library(QOIW::qoiw ALIAS qoiw)
 qoiw_configure_target(qoiw)
 target_link_libraries(qoiw PUBLIC qoiw_decode PRIVATE ${QOIW_ZSTD_TARGET})

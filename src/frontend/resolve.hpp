@@ -5,11 +5,7 @@
 
 namespace qoiw::frontend {
 
-struct Tolerance {
-    enum class Mode { Absolute, Relative };
-    Mode mode;
-    double value;
-};
+using Tolerance = Tol;
 
 struct RequestedPointTarget {
     Expr expression;

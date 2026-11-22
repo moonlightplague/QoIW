@@ -15,8 +15,8 @@
 #endif
 
 #include "common/byte_io.hpp"
-#include "pipeline/decode_field.hpp"
 #include "qoiw/core.hpp"
+#include "qoiw/qoiw.hpp"
 
 namespace {
 using namespace qoiw;
@@ -155,10 +155,10 @@ void chunked_golden() {
     std::ifstream file(QOIW_SZ3_GOLDEN, std::ios::binary);
     check(file.good(), "missing SZ3 golden stream");
     const Buffer blob{std::istreambuf_iterator<char>(file), {}};
-    const auto stream = container::read(view(blob));
+    const auto stream = inspect(blob);
     check(stream.dims == Shape{16, 32} && stream.dtype == DType::Float32 && stream.core_name == "sz3" &&
           stream.core_version == "3.4.0" && stream.core_format_version == "3.4.0" &&
-          stream.fields.at(0).bound == .125 && !stream.fields[0].decode_params.size &&
+          stream.num == 512 && stream.fields.at(0).bound == .125 && !stream.fields[0].decode_params_bytes &&
           stream.targets.at(0).expression == "x^2" && stream.targets[0].tolerance_abs == 1, "SZ3 golden metadata");
     std::vector<float> expected(512), out(512);
     std::uint32_t state = 1;
@@ -171,8 +171,8 @@ void chunked_golden() {
     for (int threads : {1, 2, 7}) {
         std::fill(out.begin(), out.end(), 17);
         const auto bytes = out.size() * sizeof(float);
-        const auto restored = pipeline::decode_field(stream, 0, get_core(stream.core_name), threads, out.data(), bytes);
-        check(restored == 88 && !std::memcmp(expected.data(), out.data(), bytes), "chunked golden decode");
+        decompress(blob, out.data(), out.size(), threads);
+        check(!std::memcmp(expected.data(), out.data(), bytes), "chunked golden decode");
     }
 }
 }  // namespace

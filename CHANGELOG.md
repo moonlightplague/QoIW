@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### M1 integrated C++ API
+
+- Add public point-wise requests, compression, inspection and capacity-checked decoding. Reuse frontend tuning and lossless correction and expose stream metadata, restoration counts and stage timings.
+
 ### M1 SZ3 adapter
 
 - Exercise SZ3 through point-wise planning, lossless correction and container decoding. Add a two-chunk golden stream that serial and OpenMP builds decode to the same 512 float32 values.

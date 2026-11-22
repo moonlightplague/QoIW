@@ -7,10 +7,7 @@
 
 namespace qoiw::frontend {
 
-struct SearchOptions {
-    int refine_rounds = 4;
-    double tie_bytes = .025;  // Relative to the cheapest eligible trial.
-};
+using qoiw::SearchOptions;
 
 struct BoundSelection {
     double bound;

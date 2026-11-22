@@ -3,6 +3,12 @@ qoiw_configure_target(qoiw_test_byte_io)
 target_link_libraries(qoiw_test_byte_io PRIVATE QOIW::qoiw)
 add_test(NAME common.byte_io COMMAND qoiw_test_byte_io)
 
+add_executable(qoiw_test_integrated cores/integrated.cpp)
+qoiw_configure_target(qoiw_test_integrated)
+target_link_libraries(qoiw_test_integrated PRIVATE QOIW::qoiw)
+add_test(NAME pipeline.integrated COMMAND qoiw_test_integrated)
+set_tests_properties(pipeline.integrated PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=4")
+
 find_package(Threads REQUIRED)
 add_executable(qoiw_test_sz3_roundtrip cores/sz3_roundtrip.cpp)
 qoiw_configure_target(qoiw_test_sz3_roundtrip)
