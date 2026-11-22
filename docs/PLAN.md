@@ -1064,7 +1064,6 @@ qoiw core-check <core> [--calibrate]
 ```
 QoI/
 ├── CMakeLists.txt
-├── PLAN.md                         this document
 ├── README.md
 ├── LICENSE
 ├── cmake/

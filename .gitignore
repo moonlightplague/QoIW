@@ -3,3 +3,4 @@ data
 .codex/
 .claude/
 /build*/
+output/

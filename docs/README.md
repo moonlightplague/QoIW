@@ -3,7 +3,7 @@
 These pages describe the implementation in this repository. The top-level
 [README](../README.md) covers building, a quick start and the command-line
 inputs. The design intent and the milestone schedule are in
-[PLAN.md](../PLAN.md); where the code differs from the plan, these pages
+[PLAN.md](PLAN.md); where the code differs from the plan, these pages
 describe the code and say so.
 
 | Page | Contents |

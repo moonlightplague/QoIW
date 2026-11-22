@@ -7,7 +7,7 @@ a sample, compresses once, checks every decoded value against the original,
 and stores the values that break a tolerance losslessly.
 
 Technical documentation: [docs/](docs/README.md) · Development plan:
-[PLAN.md](PLAN.md) · [Changelog](CHANGELOG.md)
+[PLAN.md](docs/PLAN.md) · [Changelog](CHANGELOG.md)
 
 ## Build
 

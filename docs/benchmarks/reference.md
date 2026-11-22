@@ -1,7 +1,7 @@
 # M0 reference baseline
 
 Use the public QPET revision and the SZ3 gitlink from the QoIW checkout to
-reproduce the Hurricane result in section 13.4 of [PLAN.md](../../PLAN.md).
+reproduce the Hurricane result in section 13.4 of [PLAN.md](../PLAN.md).
 The reference needs a C++17 compiler, OpenMP, pkg-config, zstd, CMake, and
 Python with NumPy. From the QoIW repository root, run
 
