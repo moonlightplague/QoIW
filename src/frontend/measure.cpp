@@ -155,8 +155,7 @@ const CandidateMeasurement& PointMeasurer::measure(double bound) {
             result.correction_weight = result.input_sensitive_share / result.sample_sensitive_share;
         result.correction_bytes_per_value = result.correction_weight * result.lossless_bytes / result.sample_values;
     }
-    result.bytes_per_value = static_cast<double>(result.core_bytes - result.overhead_bytes) / result.sample_values +
-                             result.correction_bytes_per_value;
+    result.bytes_per_value = result.core_bytes_per_value() + result.correction_bytes_per_value;
     return cache_.emplace(bound, std::move(result)).first->second;
 }
 

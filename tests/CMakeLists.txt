@@ -88,3 +88,8 @@ add_executable(qoiw_test_search unit/frontend/search.cpp)
 qoiw_configure_target(qoiw_test_search)
 target_link_libraries(qoiw_test_search PRIVATE QOIW::qoiw)
 add_test(NAME frontend.search COMMAND qoiw_test_search)
+
+add_executable(qoiw_test_plan unit/frontend/plan.cpp)
+qoiw_configure_target(qoiw_test_plan)
+target_link_libraries(qoiw_test_plan PRIVATE qoiw_mock_cores QOIW::qoiw)
+add_test(NAME frontend.plan COMMAND qoiw_test_plan)

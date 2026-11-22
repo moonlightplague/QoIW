@@ -5,10 +5,11 @@
 #include "frontend/prior.hpp"
 #include "frontend/sample.hpp"
 #include "qoiw/core.hpp"
+#include "qoiw/report.hpp"
 
 namespace qoiw::frontend {
 
-enum class ShortcutReason { FixedBound, ZeroRadii, SingleCandidate };
+using qoiw::ShortcutReason;
 
 struct PointShortcut {
     double bound;
