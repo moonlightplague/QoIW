@@ -50,6 +50,9 @@ builds reproduce the same corrected float32 values.
 
 ## Command line
 
+The CLI uses the bundled CLI11 v2.7.2 single header in `third_party/CLI11`.
+[Upstream release](https://github.com/CLIUtils/CLI11/releases/tag/v2.7.2) · [CLI11 license](LICENSES/CLI11.txt)
+
 The default build produces `build/qoiw`. The CLI reads and writes files of
 little-endian float32 or float64 values in C order. For a field with shape
 `100,500,500`, use the following commands.
@@ -66,7 +69,7 @@ Use `-d` for float64. The legacy form `-3 500 500 100` takes extents in
 fastest-varying-first order. Choose one shape form per command. Each
 `-q` starts a point-wise target and takes one `-m ABS value` or
 `-m REL fraction`. Use `-M` to set the data bound and `-X` to set an
-exact predicate. Run `build/qoiw --help` for the long options.
+exact predicate. Run `build/qoiw <command> --help` for the long options.
 
 Compression with `-a` decodes and verifies the finished stream before
 publishing the output. Omit `-z` to measure compression without saving

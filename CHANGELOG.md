@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### CLI parser
+
+- Use the vendored CLI11 v2.7.2 single header for command, option and help parsing while preserving the point-wise workflow.
+
 ### M1 command-line interface
 
 - Test the CLI on float32 and float64 files, including exact values, independent checks, malformed arguments, and safe output publication. Document the command workflow and exit statuses.

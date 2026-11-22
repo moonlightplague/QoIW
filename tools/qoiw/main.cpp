@@ -147,10 +147,6 @@ int decompress_file(const Arguments& args) {
 }
 
 int run(const Arguments& args) {
-    if (args.help) {
-        std::cout << usage();
-        return 0;
-    }
     switch (args.command) {
         case Command::Compress:
             return with_storage_type(*args.dtype, [&](auto value) { return compress_field<decltype(value)>(args); });
@@ -187,11 +183,8 @@ int run(const Arguments& args) {
 int main(int argc, char** argv) {
     try {
         std::cout << std::setprecision(std::numeric_limits<double>::max_digits10);
-        if (argc < 2 || qoiw::cli::is_help(argv[1])) {
-            std::cout << qoiw::cli::usage();
-            return argc < 2 ? 1 : 0;
-        }
-        return qoiw::cli::run(qoiw::cli::parse_arguments(argc - 1, argv + 1));
+        const auto args = qoiw::cli::parse_arguments(argc, argv);
+        return args ? qoiw::cli::run(*args) : 0;
     } catch (const std::exception& error) {
         std::cerr << "qoiw error: " << error.what() << '\n';
         return 1;

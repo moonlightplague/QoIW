@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string_view>
-
 #include "qoiw/options.hpp"
 #include "qoiw/request.hpp"
 
@@ -16,11 +14,10 @@ struct Arguments {
     std::vector<std::uint64_t> dims;
     std::optional<DType> dtype;
     std::string input, output, stream;
-    bool check_decode = false, verbose = false, json = false, help = false;
+    bool check_decode = false, verbose = false, json = false;
 };
 
-Arguments parse_arguments(int argc, char** argv);
-bool is_help(std::string_view option);
-std::string_view usage();
+// An empty result means CLI11 handled a help request.
+std::optional<Arguments> parse_arguments(int argc, char** argv);
 
 }  // namespace qoiw::cli

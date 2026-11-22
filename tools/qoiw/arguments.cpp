@@ -1,219 +1,172 @@
 #include "arguments.hpp"
 
-#include <algorithm>
+#include <CLI11.hpp>
+
 #include <charconv>
 #include <cmath>
-#include <type_traits>
+#include <limits>
+#include <string_view>
 
 #include "common/shape.hpp"
 
 namespace qoiw::cli {
 namespace {
-using std::string_view;
-using std::invalid_argument;
 
-class Tokens {
-   public:
-    Tokens(int argc, char** argv) : current_(argv), end_(argv + argc) {}
+using Shape = std::vector<std::uint64_t>;
 
-    bool empty() const { return current_ == end_; }
-    string_view next(string_view flag) {
-        if (empty()) throw invalid_argument("missing value for " + std::string(flag));
-        const string_view token = *current_++;
-        if (token.empty()) throw invalid_argument("empty value for " + std::string(flag));
-        return token;
+const CLI::Validator nonempty{[](std::string& value) {
+    return value.empty() ? "a nonempty value is required" : "";
+}, "NONEMPTY", "nonempty"};
+
+using ToleranceValues = std::pair<std::string, std::optional<double>>;
+
+Tol tolerance(const ToleranceValues& values, const char* option, bool allow_none = false) {
+    const auto& [mode, value] = values;
+    if (allow_none && (mode == "NONE" || mode == "none") && !value) return Tol::none();
+    if (value && std::isfinite(*value) && *value >= 0) {
+        if (mode == "ABS" || mode == "abs") return Tol::abs(*value);
+        if (mode == "REL" || mode == "rel") return Tol::rel(*value);
+    }
+    throw CLI::ValidationError(option, allow_none ? "expected ABS or REL with a finite nonnegative value, or NONE"
+                                                   : "expected ABS or REL with a finite nonnegative value");
+}
+
+Shape c_order_shape(std::string_view csv) {
+    // The comma-delimited spelling is a single CLI11 option value. Check the
+    // separators here so an empty extent cannot be dropped.
+    Shape dims;
+    for (;;) {
+        const auto end = csv.find(',');
+        const auto extent = csv.substr(0, end);
+        std::uint64_t value{};
+        const auto* last = extent.data() + extent.size();
+        const auto parsed = std::from_chars(extent.data(), last, value);
+        if (parsed.ec != std::errc{} || parsed.ptr != last || value == 0 || dims.size() == 4)
+            throw CLI::ValidationError("--shape", "expected one to four positive comma-separated extents");
+        dims.push_back(value);
+        if (end == std::string_view::npos) return dims;
+        csv.remove_prefix(end + 1);
+    }
+}
+
+void add_raw_options(CLI::App& app, Arguments& args) {
+    app.add_option("-i,--input", args.input, "Original raw file")->required()->check(nonempty)->take_last();
+
+    auto* storage = app.add_option_group("Raw storage")->require_option(1);
+    storage->add_flag_callback("-f,--float32", [&args] { args.dtype = DType::Float32; }, "Little-endian float32");
+    storage->add_flag_callback("-d,--float64", [&args] { args.dtype = DType::Float64; }, "Little-endian float64");
+
+    auto* shape = app.add_option_group("Raw shape")->require_option(1);
+    shape->add_option_function<std::string>("--shape", [&args](const auto& csv) { args.dims = c_order_shape(csv); },
+                                             "Comma-separated extents in C order")
+        ->type_name("N[,N...]");
+    for (int rank = 1; rank <= 4; ++rank) {
+        shape->add_option_function<Shape>("-" + std::to_string(rank),
+                                           [&args](const Shape& dims) { args.dims.assign(dims.rbegin(), dims.rend()); },
+                                           "Extents in fastest-varying-first order")
+            ->type_size(rank)
+            ->expected(1)
+            ->allow_extra_args(false)
+            ->check(CLI::Range(std::uint64_t{1}, UINT64_MAX, "POSITIVE"));
     }
 
-   private:
-    char** current_;
-    char** end_;
-};
+    app.add_option_function<std::string>("-q,--qoi", [&args](const auto& expression) {
+        args.request.targets.push_back(Target::pointwise(expression));
+    }, "Start a point-wise target. Repeat for multiple targets")->check(nonempty)->trigger_on_parse();
 
-Command parse_command(string_view name) {
-    if (name == "compress") return Command::Compress;
-    if (name == "decompress") return Command::Decompress;
-    if (name == "inspect") return Command::Inspect;
-    if (name == "verify") return Command::Verify;
-    if (name == "cores") return Command::Cores;
-    throw invalid_argument("unknown command " + std::string(name));
+    // CLI11 invokes these callbacks in argument order so each tolerance is
+    // associated with the target immediately preceding it.
+    app.add_option_function<std::pair<std::string, double>>("-m,--tolerance", [&args](const auto& values) {
+        auto& targets = args.request.targets;
+        if (targets.empty() || targets.back().tolerance.mode != Tol::Mode::None)
+            throw CLI::ValidationError("--tolerance", "specify one tolerance after each QoI");
+        targets.back().tolerance = tolerance({values.first, values.second}, "--tolerance");
+    }, "ABS or REL and a value for the preceding target")->type_name("MODE VALUE")->trigger_on_parse();
+
+    app.add_option_function<ToleranceValues>("-M,--data-bound", [&args](const auto& values) {
+        args.request.data_bound = tolerance(values, "--data-bound", true);
+    }, "ABS or REL and a value, or NONE (default)")
+        ->type_size(1, 2)->type_name("MODE [VALUE]")->trigger_on_parse();
+    app.add_option("-X,--exact", args.request.exact, "Preserve values satisfying the predicate bit for bit")
+        ->check(nonempty)->take_last();
 }
 
-template <class T>
-T nonnegative(string_view token, string_view flag) {
-    T value{};
-    const auto end = token.data() + token.size();
-    const auto parsed = std::from_chars(token.data(), end, value);
-    bool invalid = parsed.ec != std::errc{} || parsed.ptr != end;
-    if constexpr (std::is_signed_v<T>) invalid = invalid || value < 0;
-    if constexpr (std::is_floating_point_v<T>) invalid = invalid || !std::isfinite(value);
-    if (invalid)
-        throw invalid_argument("invalid numeric value for " + std::string(flag) + " (" + std::string(token) + ")");
-    return value;
-}
-
-Tol parse_tolerance(Tokens& tokens, string_view flag, bool allow_none) {
-    const auto mode = tokens.next(flag);
-    if (mode == "ABS" || mode == "abs") return Tol::abs(nonnegative<double>(tokens.next(flag), flag));
-    if (mode == "REL" || mode == "rel") return Tol::rel(nonnegative<double>(tokens.next(flag), flag));
-    if (allow_none && (mode == "NONE" || mode == "none")) return Tol::none();
-    throw invalid_argument(std::string(flag) + (allow_none ? " expects ABS, REL or NONE" : " expects ABS or REL"));
-}
-
-std::vector<std::uint64_t> parse_dimensions(string_view flag, Tokens& tokens) {
-    std::vector<std::uint64_t> dims;
-    if (flag == "--shape") {
-        auto csv = tokens.next(flag);
-        for (;;) {
-            const auto comma = csv.find(',');
-            dims.push_back(nonnegative<std::uint64_t>(csv.substr(0, comma), flag));
-            if (comma == string_view::npos) break;
-            if (dims.size() == 4) throw invalid_argument("shape must have one to four dimensions");
-            csv.remove_prefix(comma + 1);
-        }
-    } else {
-        const auto rank = flag[1] - '0';
-        for (int i = 0; i < rank; ++i) dims.push_back(nonnegative<std::uint64_t>(tokens.next(flag), flag));
-        std::reverse(dims.begin(), dims.end());
-    }
-    return dims;
-}
-
-void set_dtype(Arguments& args, DType dtype) {
-    if (args.dtype && *args.dtype != dtype) throw invalid_argument("conflicting raw storage types");
-    args.dtype = dtype;
-}
-
-bool raw_option(Arguments& args, string_view flag, Tokens& tokens) {
-    if (flag == "-f" || flag == "--float32") {
-        set_dtype(args, DType::Float32);
-    } else if (flag == "-d" || flag == "--float64") {
-        set_dtype(args, DType::Float64);
-    } else if (flag == "--shape" || flag == "-1" || flag == "-2" || flag == "-3" || flag == "-4") {
-        if (!args.dims.empty()) throw invalid_argument("specify the shape once using --shape or -1 through -4");
-        args.dims = parse_dimensions(flag, tokens);
-    } else if (flag == "-i" || flag == "--input") {
-        args.input = tokens.next(flag);
-    } else if (flag == "-q" || flag == "--qoi") {
-        args.request.targets.push_back(Target::pointwise(std::string(tokens.next(flag))));
-    } else if (flag == "-m" || flag == "--tolerance") {
-        if (args.request.targets.empty() || args.request.targets.back().tolerance.mode != Tol::Mode::None)
-            throw invalid_argument("specify one tolerance after each QoI");
-        args.request.targets.back().tolerance = parse_tolerance(tokens, flag, false);
-    } else if (flag == "-M" || flag == "--data-bound") {
-        args.request.data_bound = parse_tolerance(tokens, flag, true);
-    } else if (flag == "-X" || flag == "--exact") {
-        args.request.exact = tokens.next(flag);
-    } else {
-        return false;
-    }
-    return true;
-}
-
-bool compression_option(Arguments& args, string_view flag, Tokens& tokens) {
-    if (flag == "-c" || flag == "--core") {
-        args.options.core = tokens.next(flag);
-    } else if (flag == "--core-option") {
-        const auto item = tokens.next(flag);
+void add_compression_options(CLI::App& app, Arguments& args) {
+    app.add_option("-c,--core", args.options.core, "Compressor")->check(nonempty)->take_last()->capture_default_str();
+    app.add_option_function<std::string>("--core-option", [&args](const auto& item) {
         const auto equals = item.find('=');
-        if (equals == string_view::npos || equals == 0 || equals + 1 == item.size())
-            throw invalid_argument("--core-option expects NAME=VALUE");
-        args.options.core_options[std::string(item.substr(0, equals))] = item.substr(equals + 1);
-    } else if (flag == "--fixed-bound") {
-        args.options.fixed_bound = nonnegative<double>(tokens.next(flag), flag);
-    } else if (flag == "--allow-stream-changing-parallelism") {
-        args.options.allow_stream_changing_parallelism = true;
-    } else if (flag == "-a" || flag == "--verify") {
-        args.check_decode = true;
-    } else if (flag == "-v" || flag == "--verbose") {
-        args.verbose = true;
-    } else {
-        return false;
-    }
-    return true;
+        if (equals == std::string::npos || equals == 0 || equals + 1 == item.size())
+            throw CLI::ValidationError("--core-option", "expected NAME=VALUE");
+        args.options.core_options[item.substr(0, equals)] = item.substr(equals + 1);
+    }, "Set an adapter option such as algo=interp")->type_name("NAME=VALUE")->trigger_on_parse();
+    app.add_option_function<double>("--fixed-bound", [&args](double value) {
+        if (!std::isfinite(value) || value < 0)
+            throw CLI::ValidationError("--fixed-bound", "expected a finite nonnegative bound");
+        args.options.fixed_bound = value;
+    }, "Supply a bound and bypass tuning")->take_last();
+    app.add_flag("--allow-stream-changing-parallelism", args.options.allow_stream_changing_parallelism,
+                 "Allow the compressor to vary its stream with the thread count");
+    app.add_flag("-a,--verify", args.check_decode, "Decode and check the finished stream before writing");
+    app.add_flag("-v,--verbose", args.verbose, "Include all search trials in the text report");
 }
+
+CLI::App& subcommand(CLI::App& root, const char* name, const char* description, Command command, Arguments& args) {
+    CLI::App& app = *root.add_subcommand(name, description);
+    app.callback([&args, command] { args.command = command; });
+    if (command == Command::Compress || command == Command::Decompress || command == Command::Verify) {
+        app.add_option("-t,--threads", args.options.threads, "Thread count (zero uses the runtime default)")
+            ->check(CLI::Range(0, std::numeric_limits<int>::max(), "NONNEGATIVE"))->take_last()->capture_default_str();
+    }
+    if (command != Command::Cores) app.add_flag("--json", args.json, "Print a JSON report");
+    return app;
+}
+
+void validate_request(const Arguments& args) {
+    if (args.command != Command::Compress && args.command != Command::Verify) return;
+    if (!args.dtype) throw std::invalid_argument("missing storage type");
+    if (!common::array_bytes(*args.dtype, args.dims)) throw std::invalid_argument("invalid or overflowing shape");
+    for (const auto& target : args.request.targets) {
+        if (target.tolerance.mode == Tol::Mode::None)
+            throw std::invalid_argument("missing tolerance for " + target.expression);
+    }
+}
+
 }  // namespace
 
-bool is_help(std::string_view option) {
-    return option == "-h" || option == "--help";
-}
-
-Arguments parse_arguments(int argc, char** argv) {
-    Tokens tokens(argc, argv);
+std::optional<Arguments> parse_arguments(int argc, char** argv) {
     Arguments args;
-    args.command = parse_command(tokens.next("command"));
-    if (argc == 2 && is_help(argv[1])) {
-        args.help = true;
-        return args;
+    CLI::App app("Compress and verify fields with point-wise QoI tolerances", "qoiw");
+    app.require_subcommand(1);
+    app.footer("Exit status 0 on success, 2 on verification violations, 1 on other errors.");
+
+    auto& compress = subcommand(app, "compress", "Compress a raw field", Command::Compress, args);
+    add_raw_options(compress, args);
+    add_compression_options(compress, args);
+    compress.add_option("-z,--stream", args.stream, "Output QoIW container")->check(nonempty)->take_last();
+
+    auto& decompress = subcommand(app, "decompress", "Decode a QoIW container", Command::Decompress, args);
+    decompress.add_option("-z,--stream", args.stream, "Input QoIW container")->required()->check(nonempty)->take_last();
+    decompress.add_option("-o,--output", args.output, "Output raw file")->required()->check(nonempty)->take_last();
+
+    auto& inspect = subcommand(app, "inspect", "Read container metadata", Command::Inspect, args);
+    inspect.add_option("-z,--stream", args.stream, "Input QoIW container")->required()->check(nonempty)->take_last();
+
+    auto& verify = subcommand(app, "verify", "Check two raw fields", Command::Verify, args);
+    add_raw_options(verify, args);
+    verify.add_option("-o,--reconstructed", args.output, "Reconstructed raw field")->required()->check(nonempty)->take_last();
+
+    subcommand(app, "cores", "List built-in compression cores", Command::Cores, args);
+    try {
+        app.parse(argc, argv);
+    } catch (const CLI::ParseError& error) {
+        if (error.get_exit_code() != 0) throw std::invalid_argument(error.what());
+        const auto extras = app.remaining(true);
+        if (!extras.empty()) throw std::invalid_argument("unexpected argument " + extras.front());
+        app.exit(error);
+        return std::nullopt;
     }
-    const bool compressing = args.command == Command::Compress;
-    const bool verifying = args.command == Command::Verify;
-    const bool decompressing = args.command == Command::Decompress;
-    while (!tokens.empty()) {
-        const auto flag = tokens.next("option");
-        if (flag == "--json" && args.command != Command::Cores) {
-            args.json = true;
-        } else if ((flag == "-t" || flag == "--threads") && (compressing || verifying || decompressing)) {
-            args.options.threads = nonnegative<int>(tokens.next(flag), flag);
-        } else if ((flag == "-z" || flag == "--stream") && (compressing || decompressing || args.command == Command::Inspect)) {
-            args.stream = tokens.next(flag);
-        } else if ((decompressing && (flag == "-o" || flag == "--output")) ||
-                   (verifying && (flag == "-o" || flag == "--reconstructed"))) {
-            args.output = tokens.next(flag);
-        } else if (!((compressing || verifying) && raw_option(args, flag, tokens)) &&
-                   !(compressing && compression_option(args, flag, tokens))) {
-            throw invalid_argument("unknown option " + std::string(flag));
-        }
-    }
-    if (compressing || verifying) {
-        if (args.input.empty() || !args.dtype || args.dims.empty())
-            throw invalid_argument("raw input requires --input, a storage type and a shape");
-        if (!common::array_bytes(*args.dtype, args.dims)) throw invalid_argument("invalid or overflowing shape");
-        for (const auto& target : args.request.targets)
-            if (target.tolerance.mode == Tol::Mode::None) throw invalid_argument("missing tolerance for " + target.expression);
-    }
-    if ((decompressing || args.command == Command::Inspect) && args.stream.empty())
-        throw invalid_argument("missing --stream");
-    if ((verifying || decompressing) && args.output.empty())
-        throw invalid_argument(verifying ? "missing --reconstructed" : "missing --output");
+    validate_request(args);
     return args;
-}
-
-std::string_view usage() {
-    return R"(Usage
-  qoiw compress -i RAW (-f|-d) --shape N[,N...] [-z STREAM] [request options] [compression options]
-  qoiw decompress -z STREAM -o RAW [-t N] [--json]
-  qoiw inspect -z STREAM [--json]
-  qoiw verify -i RAW -o RECONSTRUCTED (-f|-d) --shape N[,N...] [request options] [-t N] [--json]
-  qoiw cores
-
-Raw fields
-  -i, --input FILE          Original raw file
-  -f, --float32             Little-endian float32
-  -d, --float64             Little-endian float64
-  --shape N[,N...]          C-order extents
-  -1 through -4             Alternative shape flags with fastest-varying extent first
-  -o, --output FILE         Decompression output
-  -o, --reconstructed FILE  Field to check in verify
-  -z, --stream FILE         QoIW container to write or read
-
-Request options
-  -q, --qoi EXPR            Start a point-wise target, repeat for multiple targets
-  -m, --tolerance MODE V    Set ABS or REL tolerance for the preceding target
-  -M, --data-bound MODE [V] Set ABS, REL or NONE data bound (default NONE)
-  -X, --exact EXPR          Preserve values satisfying the predicate bit for bit
-
-Compression options
-  -c, --core NAME           Compressor (default sz3)
-  --core-option NAME=VALUE  Set an adapter option such as algo=interp
-  --fixed-bound V           Supply a bound and bypass tuning
-  --allow-stream-changing-parallelism
-  -a, --verify              Decode and check the finished stream before writing
-  -v, --verbose             Include all search trials in the text report
-  -t, --threads N           Set thread count (default 1, zero uses runtime default)
-  --json                    Print a JSON report
-
-Exit status 0 on success, 2 on verification violations, 1 on other errors.
-)";
 }
 
 }  // namespace qoiw::cli
