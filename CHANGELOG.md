@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### M1 point-wise verification
+
+- Add a read-only C++ verifier for matching float32 or float64 fields. Report resolved tolerances, maximum errors, and per-constraint and distinct-value violation counts.
+
 ### M1 integrated C++ API
 
 - Document the public round trip and check that the decode library can inspect existing SZ3 streams in builds with SZ3 disabled.

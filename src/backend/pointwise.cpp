@@ -16,8 +16,9 @@ namespace {
 constexpr std::size_t kChunk = 2048;
 using Mask = std::bitset<kChunk>;
 
-template <class T>
-Mask check_chunk(const T* original, const T* decoded, std::size_t count, const ResolvedPointRequest& request) {
+template <bool Diagnose, class T>
+Mask check_chunk(const T* original, const T* decoded, std::size_t count, const ResolvedPointRequest& request,
+                 Verification* stats = nullptr) {
     Mask restore;
     if (std::memcmp(original, decoded, count * sizeof(T)) == 0) return restore;
 
@@ -28,10 +29,27 @@ Mask check_chunk(const T* original, const T* decoded, std::size_t count, const R
     for (std::size_t i = 0; i < count; ++i) {
         if (std::memcmp(original + i, decoded + i, sizeof(T)) == 0) continue;
         const double a = original[i], b = decoded[i];
-        if (!std::isfinite(a) || !std::isfinite(b) ||
-            (request.data_bound_abs && !(std::abs(a - b) <= *request.data_bound_abs))) {
+        if (!std::isfinite(a) || !std::isfinite(b)) {
             restore.set(i);
-        } else if (request.exact || !request.targets.empty()) {
+            if constexpr (Diagnose) {
+                ++stats->data.violations;
+                ++stats->data.nonfinite_violations;
+            }
+            continue;
+        }
+        if (Diagnose || request.data_bound_abs) {
+            const double error = std::abs(a - b);
+            const bool violates = request.data_bound_abs && !(error <= *request.data_bound_abs);
+            if constexpr (Diagnose) {
+                stats->data.max_abs_error = std::max(stats->data.max_abs_error, error);
+                stats->data.violations += violates;
+            }
+            if (violates) {
+                restore.set(i);
+                if constexpr (!Diagnose) continue;
+            }
+        }
+        if (request.exact || !request.targets.empty()) {
             offsets[pending] = i;
             x[pending] = a;
             y[pending] = b;
@@ -51,11 +69,26 @@ Mask check_chunk(const T* original, const T* decoded, std::size_t count, const R
     if (request.exact) {
         // A changed original may neither leave nor enter the exact set, nor
         // change bits while remaining in it.
-        check_expression(*request.exact, [](double a, double b) { return a != 0 || b != 0; });
+        check_expression(*request.exact, [&](double a, double b) {
+            const bool violates = a != 0 || b != 0;
+            if constexpr (Diagnose) stats->exact_violations += violates;
+            return violates;
+        });
     }
-    for (const auto& target : request.targets) {
+    for (std::size_t t = 0; t < request.targets.size(); ++t) {
+        const auto& target = request.targets[t];
         check_expression(target.expression, [&](double a, double b) {
-            return !(std::abs(a - b) <= target.tolerance_abs);
+            const double error = std::abs(a - b);
+            const bool violates = !(error <= target.tolerance_abs);
+            if constexpr (Diagnose) {
+                auto& summary = stats->targets[t].errors;
+                if (std::isfinite(a) && std::isfinite(b))
+                    summary.max_abs_error = std::max(summary.max_abs_error, error);
+                else
+                    ++summary.nonfinite_violations;
+                summary.violations += violates;
+            }
+            return violates;
         });
     }
     return restore;
@@ -67,7 +100,7 @@ std::vector<std::size_t> find_indices(const T* original, const T* decoded, std::
     std::vector<Mask> chunks(1 + (count - 1) / kChunk);
     common::parallel_for(chunks.size(), threads, [&](std::size_t chunk) {
         const auto begin = chunk * kChunk;
-        chunks[chunk] = check_chunk(original + begin, decoded + begin, std::min(kChunk, count - begin), request);
+        chunks[chunk] = check_chunk<false>(original + begin, decoded + begin, std::min(kChunk, count - begin), request);
     });
 
     std::size_t total = 0;
@@ -84,20 +117,64 @@ std::vector<std::size_t> find_indices(const T* original, const T* decoded, std::
     }
     return indices;
 }
-}  // namespace
-
-PointCorrections correct_pointwise(DType dtype, const void* original, void* decoded,
-                                   std::size_t array_bytes, const ResolvedPointRequest& request, int threads) {
+std::size_t checked_count(DType dtype, const void* original, const void* decoded, std::size_t array_bytes,
+                          const ResolvedPointRequest& request, int threads) {
     const auto width = common::element_bytes(dtype);
     if (!width || !original || !decoded || !array_bytes || array_bytes % width || threads < 0)
-        throw std::invalid_argument("invalid point-wise correction buffers or thread count");
+        throw std::invalid_argument("invalid point-wise buffers or thread count");
     auto valid = [](double bound) { return std::isfinite(bound) && bound >= 0; };
     if (request.data_bound_abs && !valid(*request.data_bound_abs)) throw std::invalid_argument("invalid data bound");
     for (const auto& target : request.targets) {
         if (!valid(target.tolerance_abs)) throw std::invalid_argument("invalid point-wise tolerance");
     }
 
-    const auto count = array_bytes / width;
+    return array_bytes / width;
+}
+
+void merge_errors(ErrorStats& into, const ErrorStats& from) {
+    into.max_abs_error = std::max(into.max_abs_error, from.max_abs_error);
+    into.violations += from.violations;
+    into.nonfinite_violations += from.nonfinite_violations;
+}
+
+template <class T>
+Verification verify_values(const T* original, const T* decoded, std::size_t count,
+                           const ResolvedPointRequest& request, int threads) {
+    // Reuse one set of diagnostic counters across several expression batches.
+    constexpr std::size_t group_size = 32 * kChunk;
+    std::vector<Verification> groups(1 + (count - 1) / group_size);
+    common::parallel_for(groups.size(), threads, [&](std::size_t group) {
+        auto& stats = groups[group];
+        stats.targets.resize(request.targets.size());
+        const std::size_t begin = group * group_size;
+        const std::size_t end = begin + std::min(group_size, count - begin);
+        for (std::size_t offset = begin; offset < end;) {
+            const auto length = std::min(kChunk, end - offset);
+            stats.violating_values += check_chunk<true>(original + offset, decoded + offset, length, request,
+                                                        &stats).count();
+            offset += length;
+        }
+    });
+
+    Verification result;
+    result.values = count;
+    result.data_bound_abs = request.data_bound_abs;
+    for (const auto& target : request.targets)
+        result.targets.push_back({{target.expression.text(), target.tolerance_abs}, {}});
+    for (const auto& stats : groups) {
+        result.violating_values += stats.violating_values;
+        result.exact_violations += stats.exact_violations;
+        merge_errors(result.data, stats.data);
+        for (std::size_t t = 0; t < result.targets.size(); ++t)
+            merge_errors(result.targets[t].errors, stats.targets[t].errors);
+    }
+    return result;
+}
+}  // namespace
+
+PointCorrections correct_pointwise(DType dtype, const void* original, void* decoded,
+                                   std::size_t array_bytes, const ResolvedPointRequest& request, int threads) {
+    const auto count = checked_count(dtype, original, decoded, array_bytes, request, threads);
     const auto indices = dtype == DType::Float32
         ? find_indices(static_cast<const float*>(original), static_cast<const float*>(decoded), count, request, threads)
         : find_indices(static_cast<const double*>(original), static_cast<const double*>(decoded), count, request, threads);
@@ -105,6 +182,14 @@ PointCorrections correct_pointwise(DType dtype, const void* original, void* deco
     result.lossless = encode_lossless(dtype, original, array_bytes, indices);
     result.restored = apply_lossless({result.lossless.data(), result.lossless.size()}, dtype, decoded, array_bytes);
     return result;
+}
+
+Verification verify_pointwise(DType dtype, const void* original, const void* decoded,
+                              std::size_t array_bytes, const ResolvedPointRequest& request, int threads) {
+    const auto count = checked_count(dtype, original, decoded, array_bytes, request, threads);
+    return dtype == DType::Float32
+        ? verify_values(static_cast<const float*>(original), static_cast<const float*>(decoded), count, request, threads)
+        : verify_values(static_cast<const double*>(original), static_cast<const double*>(decoded), count, request, threads);
 }
 
 }  // namespace qoiw::backend

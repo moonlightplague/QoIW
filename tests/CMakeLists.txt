@@ -9,6 +9,12 @@ target_link_libraries(qoiw_test_integrated PRIVATE QOIW::qoiw)
 add_test(NAME pipeline.integrated COMMAND qoiw_test_integrated)
 set_tests_properties(pipeline.integrated PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=4")
 
+add_executable(qoiw_test_verify cores/verify.cpp)
+qoiw_configure_target(qoiw_test_verify)
+target_link_libraries(qoiw_test_verify PRIVATE QOIW::qoiw)
+add_test(NAME pipeline.verify COMMAND qoiw_test_verify)
+set_tests_properties(pipeline.verify PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=4")
+
 find_package(Threads REQUIRED)
 add_executable(qoiw_test_sz3_roundtrip cores/sz3_roundtrip.cpp)
 qoiw_configure_target(qoiw_test_sz3_roundtrip)

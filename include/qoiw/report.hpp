@@ -47,6 +47,29 @@ struct TargetTolerance {
     double tolerance_abs = 0;
 };
 
+struct ErrorStats {
+    // Maximum over pairs with finite operands. Subtraction can overflow to infinity.
+    double max_abs_error = 0;
+    std::size_t violations = 0;
+    std::size_t nonfinite_violations = 0;  // Subset of violations.
+};
+
+struct TargetVerification {
+    TargetTolerance target;
+    ErrorStats errors;
+};
+
+struct Verification {
+    std::size_t values = 0;
+    std::size_t violating_values = 0;  // Counts a value once even if several checks fail.
+    std::size_t exact_violations = 0;
+    std::optional<double> data_bound_abs;
+    ErrorStats data;
+    std::vector<TargetVerification> targets;  // Request order.
+
+    bool ok() const noexcept { return violating_values == 0; }
+};
+
 struct Plan {
     std::vector<double> bound;
     double reference_bound = 0;

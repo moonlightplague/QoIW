@@ -6,6 +6,7 @@
 #include "backend/pointwise.hpp"
 #include "common/shape.hpp"
 #include "frontend/plan.hpp"
+#include "pipeline/compile_request.hpp"
 #include "pipeline/stream.hpp"
 
 namespace qoiw {
@@ -14,21 +15,6 @@ using Clock = std::chrono::steady_clock;
 
 double seconds_since(Clock::time_point start) {
     return std::chrono::duration<double>(Clock::now() - start).count();
-}
-
-frontend::PointRequest compile(const Request& request) {
-    if (request.targets.size() > UINT8_MAX) throw std::invalid_argument("too many point-wise targets");
-    auto expression = [](const std::string& text) {
-        if (text.size() > UINT16_MAX) throw std::invalid_argument("expression exceeds the container string limit");
-        return Expr(text);
-    };
-    frontend::PointRequest compiled;
-    compiled.targets.reserve(request.targets.size());
-    for (const auto& target : request.targets)
-        compiled.targets.push_back({expression(target.expression), target.tolerance});
-    if (request.data_bound.mode != Tol::Mode::None) compiled.data_bound = request.data_bound;
-    if (request.exact) compiled.exact = expression(*request.exact);
-    return compiled;
 }
 
 const Core& resolve_core(const Options& options) {
@@ -84,9 +70,9 @@ std::vector<std::uint8_t> compress(const ArrayView& input, const Request& reques
     {
         const auto traits = core.traits(input.dtype, input.dims.size());
         const auto& tuning = options.frontend;
-        auto prepared = frontend::prepare_pointwise(input.dtype, input.data, bytes, input.dims, compile(request),
-                                                     traits, params.threads, options.fixed_bound, tuning.prior,
-                                                     tuning.sampling);
+        auto prepared = frontend::prepare_pointwise(input.dtype, input.data, bytes, input.dims,
+                                                     pipeline::compile_point_request(request), traits, params.threads,
+                                                     options.fixed_bound, tuning.prior, tuning.sampling);
         result.plan = call_core([&] {
             return frontend::plan_pointwise(core, prepared, params, tuning.search, tuning.rare_outlier_share);
         });
