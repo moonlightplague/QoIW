@@ -68,6 +68,7 @@ backend::PointCorrections correct_field(const Core& core, const CoreOutput& payl
 std::vector<std::uint8_t> pipeline::compress_field(const ArrayView& input, const Request& request, const Options& options,
                                                  Report* report, const Core* supplied_core,
                                                  std::vector<std::uint8_t>* verified) try {
+    const auto call_start = Clock::now();
     const auto bytes = common::array_bytes(input.dtype, input.dims);
     if (!input.data || !bytes || options.threads < 0) throw std::invalid_argument("invalid input or thread count");
     const Core& core = supplied_core ? *supplied_core : resolve_core(options);
@@ -119,6 +120,7 @@ std::vector<std::uint8_t> pipeline::compress_field(const ArrayView& input, const
     result.seconds.container = seconds_since(start);
     if (report) {
         result.stream = pipeline::describe_stream(stream, blob.size());
+        result.seconds.total = seconds_since(call_start);
         *report = std::move(result);
     }
     return blob;

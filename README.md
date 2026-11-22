@@ -7,7 +7,7 @@ a sample, compresses once, checks every decoded value against the original,
 and stores the values that break a tolerance losslessly.
 
 Technical documentation: [docs/](docs/README.md) · Development plan:
-[PLAN.md](PLAN.md) · [Changelog](CHANGELOG.md)
+[PLAN.md](docs/PLAN.md) · [Changelog](CHANGELOG.md)
 
 ## Build
 
@@ -21,10 +21,9 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-The tool is `build/qoiw`. Common options: `-DQOIW_FETCH_DEPS=ON` fetches
-zstd when no system package is found, `-DQOIW_CORE_SZ3=OFF` builds without
-SZ3, `-DQOIW_BUILD_TESTS=OFF` skips the tests. All options:
-[docs/building.md](docs/building.md).
+The tool is `build/qoiw`. The build includes SZ3. Set `-DQOIW_FETCH_DEPS=ON`
+to fetch zstd when no system package is found or `-DQOIW_BUILD_TESTS=OFF`
+to skip the tests. See [build options](docs/building.md).
 
 ## Quick start
 
@@ -39,7 +38,10 @@ build/qoiw verify     -f --shape 100,500,500 -i U.f32 -o U.out.f32 -q 'x^2' -m R
 ```
 
 On Hurricane ISABEL `Uf48.bin.f32` this gives a 4.5 MB stream (ratio 22.05),
-with 308,049 values restored and every value within tolerance.
+with 308,049 values restored and every value within tolerance. Each command
+prints a sectioned report with a runtime breakdown and ends with a summary line
+of the compression ratio and total time; an annotated example is in
+[docs/cli.md](docs/cli.md#text-reports).
 
 From C++, link `QOIW::qoiw`:
 
@@ -56,6 +58,23 @@ qoiw::decompress(blob, decoded.data(), decoded.size());
 
 API reference: [docs/api.md](docs/api.md).
 
+## Add your own core
+
+1. In `src/core/adapters/`, write `mycore.cpp` to wrap your compressor's
+   public API as a `qoiw::Core`. Declare `const Core& mycore_core();` inside
+   `namespace qoiw` in `mycore.hpp` and include that header in `mycore.cpp`.
+   Have the factory return a static adapter instance whose `name()` is
+   `"mycore"`. Follow the [SZ3 adapter](src/core/adapters/sz3.cpp) and
+   [header](src/core/adapters/sz3.hpp).
+2. Add `src/core/adapters/mycore.cpp` to `QOIW_CORE_SOURCES` in
+   [CMakeLists.txt](CMakeLists.txt). If your compressor needs a library,
+   link it to `qoiw_decode`. CMake picks up the matching header and factory
+   from the source filename.
+3. Rebuild with `cmake --build build --parallel`. Check `build/qoiw cores`,
+   then pass `--core mycore` to `build/qoiw compress` or set
+   `options.core = "mycore"` in C++. Decoding picks the core from the file. See the
+   [adapter contract](docs/cores.md#interface) for buffer and threading rules.
+
 ## Command line
 
 ```
@@ -66,6 +85,8 @@ qoiw decompress -z FILE -o FILE [-t N] [--json]
 qoiw inspect    -z FILE [--json]
 qoiw verify     (-f|-d) (--shape ... | -1 .. -4 ...) -i FILE -o FILE [targets] [-M ...] [-X PRED] [-t N] [--json]
 qoiw cores
+
+Every command also takes --color auto|always|never.
 ```
 
 `qoiw <command> --help` prints the same options.
@@ -106,6 +127,7 @@ predicate. A constant or empty range makes the fraction an absolute value.
 | `-v`, `--verbose` | `compress`: print every bound the tuner measured. |
 | `-t`, `--threads N` | Threads; default 1, `0` uses the OpenMP default. |
 | `--json` | Print a JSON report instead of text. |
+| `--color auto\|always\|never` | Style the text report. `auto` (default) colours only a terminal and honours `NO_COLOR`. |
 
 ### Exit status
 

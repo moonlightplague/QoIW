@@ -110,9 +110,23 @@ struct StreamInfo {
     std::string to_json() const;
 };
 
+// Wall-clock seconds of one compress() call. planning is the frontend,
+// core_encode and core_decode the full-field core calls, correction and
+// container the backend, and verification the report's check of the
+// corrected reconstruction. total covers the whole call, including work
+// outside these stages, so it is at least their sum.
 struct CompressionTimes {
-    double planning = 0, core_encode = 0, core_decode = 0, correction = 0, container = 0;  // Seconds.
+    double planning = 0, core_encode = 0, core_decode = 0, correction = 0, container = 0;
     double verification = 0;
+    double total = 0;
+};
+
+// Wall-clock seconds of one decompress() call: container parsing, the core's
+// decompression, applying the corrections, and the whole call.
+struct DecompressionTimes {
+    double parse = 0, core_decode = 0, correction = 0, total = 0;
+
+    std::string to_json() const;
 };
 
 struct Report {

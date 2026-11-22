@@ -188,7 +188,15 @@ std::string Report::to_json() const {
         << ",\"verification\":" << verification.to_json() << ",\"seconds\":{\"planning\":" << number(seconds.planning)
         << ",\"core_encode\":" << number(seconds.core_encode) << ",\"core_decode\":" << number(seconds.core_decode)
         << ",\"correction\":" << number(seconds.correction) << ",\"verification\":" << number(seconds.verification)
-        << ",\"container\":" << number(seconds.container) << "}}";
+        << ",\"container\":" << number(seconds.container) << ",\"total\":" << number(seconds.total) << "}}";
+    return out.str();
+}
+
+std::string DecompressionTimes::to_json() const {
+    std::ostringstream out;
+    out.imbue(std::locale::classic());
+    out << "{\"parse\":" << number(parse) << ",\"core_decode\":" << number(core_decode)
+        << ",\"correction\":" << number(correction) << ",\"total\":" << number(total) << '}';
     return out.str();
 }
 

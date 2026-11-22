@@ -15,8 +15,11 @@ StreamInfo inspect(Bytes stream);
 
 // Decode one field using its stored core and corrections. Capacity counts
 // values of the specified output type. Use the output only after success.
-void decompress(Bytes stream, float* out, std::size_t capacity, int threads = 1);
-void decompress(Bytes stream, double* out, std::size_t capacity, int threads = 1);
+// Assign the stage times on success when times is not null.
+void decompress(Bytes stream, float* out, std::size_t capacity, int threads = 1,
+                DecompressionTimes* times = nullptr);
+void decompress(Bytes stream, double* out, std::size_t capacity, int threads = 1,
+                DecompressionTimes* times = nullptr);
 
 // Check two fields of the same shape and storage type. Resolve relative
 // tolerances on the original field. Neither input is modified.

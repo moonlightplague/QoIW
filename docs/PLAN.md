@@ -662,7 +662,7 @@ first place that sets it: the user, the core's hints, the default derived from t
 
 | Mechanism | What the integrator writes | Compressor is | Cost | Use for |
 |---|---|---|---|---|
-| **In-tree adapter** | one `.cpp` of about 100 lines in `src/core/adapters/`, a CMake option | linked in; source from a submodule, `find_package`, or fetched | none | the supported cores: SZ3 first, then ZFP, SPERR, SZo |
+| **In-tree adapter** | a `.cpp` and matching factory header in `src/core/adapters/`, with the source added to the CMake adapter list | linked in; source from a submodule, `find_package`, or fetched | none | the supported cores: SZ3 first, then ZFP, SPERR, SZo |
 | **Plugin (C ABI)** | a shared library exporting one function that returns a table of function pointers | linked into the plugin; `qoiw` is not rebuilt | one `dlopen` | in-house or licensed compressors; cores written in other languages; Python prototypes through callbacks |
 | **libpressio bridge** | nothing: `core = "pressio:<id>"` | whatever libpressio was built with | negligible | breadth: one adapter reaches every libpressio compressor that takes an absolute error bound |
 | **Command-line bridge** | a small text template with the compress and decompress commands | an executable, even closed-source | process start and temporary files per call | compressors that only exist as a tool; slow, so the sample uses few blocks |
@@ -1064,11 +1064,10 @@ qoiw core-check <core> [--calibrate]
 ```
 QoI/
 ├── CMakeLists.txt
-├── PLAN.md                         this document
 ├── README.md
 ├── LICENSE
 ├── cmake/
-│   ├── QoiwCores.cmake             how each core is found: submodule, find_package, fetch
+│   ├── QoiwCores.cmake             core dependencies and built-in registry generation
 │   ├── QoiwOptions.cmake           warnings, sanitizers, floating-point flags
 │   └── qoiwConfig.cmake.in
 ├── SZ3/                            git submodule, unmodified
@@ -1137,13 +1136,13 @@ QoI/
 
 | Option | Default | Effect |
 |---|---|---|
-| `QOIW_CORE_SZ3` | ON | SZ3 adapter, from `./SZ3` |
-| `QOIW_SZ3_SOURCE_DIR`, `QOIW_SZ3_USE_INSTALLED` | unset, OFF | another checkout, or `find_package(SZ3 3.4)` |
-| `QOIW_CORE_ZFP`, `QOIW_CORE_SPERR`, `QOIW_CORE_SZO` | OFF until M2 | adapters; source from `find_package` or fetched at a pinned tag |
 | `QOIW_CORE_PRESSIO` | OFF | libpressio bridge; needs libpressio installed |
 | `QOIW_CORE_EXEC`, `QOIW_CORE_PLUGINS` | ON | command-line bridge; plugin loader |
 | `QOIW_BUILD_TOOLS`, `QOIW_BUILD_TESTS`, `QOIW_BUILD_C_API`, `QOIW_BUILD_PYTHON` | ON | |
 | `QOIW_SANITIZE` | none | address, undefined, thread |
+
+Built-in adapters are listed in `QOIW_CORE_SOURCES` and built by default.
+SZ3 comes from the pinned `./SZ3` submodule.
 
 ```bash
 git submodule update --init SZ3

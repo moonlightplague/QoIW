@@ -1,5 +1,6 @@
 #pragma once
 
+#include "console.hpp"
 #include "qoiw/options.hpp"
 #include "qoiw/request.hpp"
 
@@ -15,6 +16,7 @@ struct Arguments {
     std::optional<DType> dtype;
     std::string input, output, stream;
     bool check_decode = false, verbose = false, json = false;
+    ColorMode color = ColorMode::Auto;
 };
 
 // An empty result means CLI11 handled a help request.

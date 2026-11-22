@@ -23,6 +23,50 @@ def read_json(*args, status=0):
     return json.loads(cli(*args, "--json", status=status), parse_constant=reject_nonfinite)
 
 
+def check_compression_runtime(result, checked):
+    runtime, seconds = result["runtime"], result["report"]["seconds"]
+    stages = ("planning", "core_encode", "core_decode", "correction", "container", "verification")
+    assert all(seconds[name] >= 0 for name in stages)
+    assert seconds["total"] >= sum(seconds[name] for name in stages)
+    assert runtime["compress"] == seconds["total"]
+    check = runtime["post_decode"]
+    assert (check is not None) == checked
+    parts = runtime["read_input"] + runtime["compress"] + (runtime["write_stream"] or 0)
+    if check:
+        decode = check["decompress"]
+        assert decode["total"] >= decode["parse"] + decode["core_decode"] + decode["correction"]
+        parts += decode["total"] + check["verify"]
+    assert runtime["total"] >= parts
+
+
+def check_decompression_runtime(result):
+    runtime = result["runtime"]
+    decode = runtime["decompress"]
+    assert min(decode.values()) >= 0
+    assert decode["total"] >= decode["parse"] + decode["core_decode"] + decode["correction"]
+    assert runtime["total"] >= runtime["read_stream"] + decode["total"] + runtime["write_output"]
+
+
+def text_reports(root, raw, blob, decoded, request):
+    compress = ["compress", "-f", "--shape", "7,11", "-i", raw, *request]
+    text = cli(*compress)
+    for heading in ("Input", "Request", "Plan", "Stream", "Verification", "Runtime"):
+        assert f"\n{heading}\n" in text, heading
+    assert "Compression ratio" in text and "Total time" in text and "PASSED" in text
+    assert "frontend (tuning)" in text and "backend" in text and "(not saved)" in text
+    assert "\033[" not in text and "\033[" not in cli(*compress, "--color", "auto")
+    assert "\033[1;36m" in cli(*compress, "--color", "always")
+    cli(*compress, "--color", "sometimes", status=1)
+    checked = cli(*compress, "-a", "-v")
+    assert "on decode (-a)" in checked and "decode container" in checked and "Measured bounds (" in checked
+    text = cli("decompress", "-z", blob, "-o", decoded)
+    assert "core decompress" in text and "Compression ratio" in text and "Total time" in text
+    text = cli("inspect", "-z", blob, "--color", "never")
+    assert "Compression ratio" in text and "Total time" not in text
+    text = cli("verify", "-f", "--shape", "7,11", "-i", raw, "-o", decoded, *request)
+    assert "PASSED" in text and "Total time" in text
+
+
 def round_trip_f32(root):
     raw, blob, decoded = (root / name for name in ("x.f32", "x.qoiw", "decoded.f32"))
     values = [-0.0, 1e36] + [(i + 1.5) / 64 for i in range(75)]
@@ -35,13 +79,16 @@ def round_trip_f32(root):
     assert plan["report"]["plan"]["shortcut_reason"] == "fixed_bound"
     assert plan["report"]["restored"] > 0
     assert plan["report"]["verification"]["ok"] and plan["post_decode"]["ok"]
+    check_compression_runtime(plan, checked=True)
     header = read_json("inspect", "-z", blob)
     assert header == plan["report"]["stream"]
     assert header["shape"] == [7, 11] and header["dtype"] == "float32" and header["num"] == 77
     assert header["targets"][0]["expression"] == "x^2\n" and header["targets"][1]["tolerance_abs"] == 0
     assert header["fields"][0]["data_bound_abs"] == .15
     assert header["stream_bytes"] == blob.stat().st_size
-    assert read_json("decompress", "--stream", blob, "--output", decoded, "--threads", 2) == header
+    decompressed = read_json("decompress", "--stream", blob, "--output", decoded, "--threads", 2)
+    assert decompressed["stream"] == header
+    check_decompression_runtime(decompressed)
 
     output = decoded.read_bytes()
     assert len(output) == len(source) and output[:8] == source[:8]
@@ -50,6 +97,7 @@ def round_trip_f32(root):
         assert abs(a * a - b * b) <= header["targets"][0]["tolerance_abs"]
     verification = read_json("verify", "-i", raw, "-o", decoded, "-f", "--shape", "7,11", *request)
     assert verification == plan["post_decode"]
+    text_reports(root, raw, blob, decoded, request)
 
     alias = root / "alias"
     os.link(raw, alias)
@@ -72,8 +120,10 @@ def round_trip_f64(root):
     raw.write_bytes(struct.pack("<96d", *values))
     options = ["--input", raw, "--float64", "--shape", "3,4,8", "--qoi", "x^2",
                "--tolerance", "abs", ".001", "--data-bound", "NONE", "--verbose"]
-    assert "Trial bound=" in cli("compress", *options)
+    assert "Measured bounds (" in cli("compress", *options)
     result = read_json("compress", *options, f"--stream={blob}", "-av")
+    check_compression_runtime(result, checked=True)
+    assert read_json("compress", *options)["runtime"]["write_stream"] is None
     report = result["report"]
     assert report["stream"]["shape"] == [3, 4, 8] and report["stream"]["dtype"] == "float64"
     assert report["plan"]["trace"] and result["post_decode"]["ok"]
@@ -115,18 +165,14 @@ assert "SUBCOMMANDS" in cli("--help")
 verify_help = cli("verify", "--help")
 assert "qoiw verify" in verify_help and "--reconstructed" in verify_help
 cli("unknown", "--help", status=1)
-golden = Path(sys.argv[3])
+golden = Path(sys.argv[2])
 assert read_json("inspect", "-z", golden)["shape"] == [16, 32]
 with tempfile.TemporaryDirectory(prefix="qoiw-cli-") as directory:
     root = Path(directory)
     malformed_inputs(root)
-    if sys.argv[2] == "1":
-        assert "sz3 version=" in cli("cores")
-        round_trip_f32(root)
-        round_trip_f64(root)
-    else:
-        assert not cli("cores")
-        unavailable_output = root / "unavailable.f32"
-        cli("decompress", "-z", golden, "-o", unavailable_output, status=1)
-        assert not unavailable_output.exists()
+    cores = cli("cores").splitlines()
+    assert cores[0].split()[:3] == ["Core", "version", "format"]
+    assert any(line.split()[:1] == ["sz3"] and "strict" in line for line in cores[1:])
+    round_trip_f32(root)
+    round_trip_f64(root)
     assert not list(root.glob(".qoiw-*"))

@@ -183,11 +183,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("probe", type=Path)
     parser.add_argument("--profile", choices=("small", "full"), default="small")
-    parser.add_argument("--sz3", choices=("0", "1"), required=True)
     args = parser.parse_args()
-    cores = ["mock:" + name for name in MOCKS]
-    if args.sz3 == "1":
-        cores.append("sz3")
+    cores = ["mock:" + name for name in MOCKS] + ["sz3"]
     cells = values = 0
     restored = Counter()
     with tempfile.TemporaryDirectory(prefix="qoiw-matrix-") as work:

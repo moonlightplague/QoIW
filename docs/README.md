@@ -3,7 +3,7 @@
 These pages describe the implementation in this repository. The top-level
 [README](../README.md) covers building, a quick start and the command-line
 inputs. The design intent and the milestone schedule are in
-[PLAN.md](../PLAN.md); where the code differs from the plan, these pages
+[PLAN.md](PLAN.md); where the code differs from the plan, these pages
 describe the code and say so.
 
 | Page | Contents |
@@ -33,7 +33,7 @@ CLI. The following parts of the plan are not implemented yet.
 | Decoded-value fingerprint | M3 | The field header has the slot. The encoder writes 0 and the decoder does not check it. |
 | `float32` threshold rule (plan section 6.5) | M3 | Comparisons are evaluated in double precision only. |
 | Lossless fallback for incompressible data | M3 | Not implemented. |
-| Core traits beyond `bound_kind`, `fixed_call_overhead`, `thread_safe`; plugins; bridges; ZFP, SPERR, SZo | M2 | Built-in registry with `sz3` only. |
+| Core traits beyond `bound_kind`, `fixed_call_overhead`, `thread_safe`; plugins; bridges; ZFP, SPERR, SZo | M2 | Built-in registry generated from the adapter source list, which ships with SZ3. |
 | `predict`, `guard`, `apply` | M2 | Not exposed. The frontend can be called internally. |
 | Target lists with regions, aggregates, several fields | M4 | Lists of point-wise targets of one field only. |
 | C API, Python package | M6 | Not implemented. |
