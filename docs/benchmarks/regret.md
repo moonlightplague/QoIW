@@ -4,9 +4,9 @@ The manifest fixes the 20 cases from the research tuning study, with raw
 float32 inputs in C order. The harness resolves both relative tolerances
 using NumPy and supplies the same absolute values to QoIW and QPET. Use the
 pinned QPET build and local data layout from the reference guide.
-[Cases](../cases/regret.csv) · [Reference build and data](../reference/README.md)
+[Cases](../../bench/cases/regret.csv) · [Reference build and data](reference.md)
 
-The sequential timing run uses the same manifest. [M1 timing and memory](PERFORMANCE.md)
+The sequential timing run uses the same manifest. [M1 timing and memory](performance.md)
 
 Build the QoIW CLI and the helper that exposes the smallest positive
 sampled F1 radius and scan cap. Build both compressors against the same

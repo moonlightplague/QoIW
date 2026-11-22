@@ -28,7 +28,7 @@ def main():
     parser.add_argument("--dataset", choices=datasets, action="append", help="check one dataset (repeatable)")
     args = parser.parse_args()
     if not os.environ.get("QOIW_DATA_DIR"):
-        parser.error("set QOIW_DATA_DIR to the data root described in bench/reference/README.md")
+        parser.error("set QOIW_DATA_DIR to the data root described in docs/benchmarks/reference.md")
     root = Path(os.environ["QOIW_DATA_DIR"])
     ok = True
     for dataset in args.dataset or datasets:

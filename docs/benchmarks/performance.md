@@ -3,7 +3,7 @@
 Run the benchmark on a quiet Linux machine with an OpenMP-enabled Release
 build and NumPy. The runner uses the 20 float32 C-order cases and the same
 independently resolved absolute tolerances as the regret sweep.
-[Cases](../cases/regret.csv) · [Reference data](../reference/README.md)
+[Cases](../../bench/cases/regret.csv) · [Reference data](reference.md)
 
 ```sh
 cmake -S . -B build-performance -DCMAKE_BUILD_TYPE=Release \

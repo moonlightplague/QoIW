@@ -42,7 +42,7 @@ an absolute tolerance of 2.8113926907, a ratio of 0.999999416, and a PSNR of
 ### Benchmark inputs
 
 Set `QOIW_DATA_DIR` to a local directory with the dataset folders in
-[inputs.csv](inputs.csv). Directory symlinks can point to existing read-only
+[inputs.csv](../../bench/reference/inputs.csv). Directory symlinks can point to existing read-only
 SDRBench files. In particular, `Miranda` holds the 256 × 384 × 384 float64
 fields, `NWChem` holds the three raw float64 arrays, and `JHTDB` holds the
 `velocity` and `pressure` directories of the iso1024 cutout. The field list
@@ -66,4 +66,4 @@ The eight JHTDB fields for steps 0500 and 5000 await read access on this machine
 All inputs for the 20 M1 regret cases passed the inventory check.
 
 Use the same data root and reference build for the
-[M1 regret and parity benchmark](../regret/README.md).
+[M1 regret and parity benchmark](regret.md).
