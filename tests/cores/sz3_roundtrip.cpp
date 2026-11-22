@@ -2,11 +2,17 @@
 #include <cmath>
 #include <cstring>
 #include <functional>
+#include <future>
 #include <iostream>
 #include <limits>
 #include <numeric>
 #include <stdexcept>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+#include "common/byte_io.hpp"
 #include "qoiw/core.hpp"
 
 namespace {
@@ -95,6 +101,50 @@ void check_arguments(const Core& core) {
     check(out == std::vector<float>(32, -123) && wide == std::vector<double>(32, -123),
           "SZ3 wrote output before validating the layout");
 }
+
+void thread_modes(const Core& core) {
+    const Shape shape{128, 47};
+    std::vector<float> data(128 * 47);
+    for (std::size_t i = 0; i < data.size(); ++i) data[i] = std::sin(.021 * i);
+    auto encode = [&](int threads, bool chunked) {
+        return core.compress(data.data(), DType::Float32, shape, {.01, threads, chunked, {}}).stream;
+    };
+    const auto serial = encode(1, false);
+    check(encode(4, false) == serial && encode(0, false) == serial && encode(1, true) == serial,
+          "thread count alone changed SZ3's stream");
+#ifdef _OPENMP
+    const int previous_threads = omp_get_max_threads(), previous_levels = omp_get_max_active_levels();
+#endif
+    const auto two = encode(2, true), four = encode(4, true);
+#ifdef _OPENMP
+    auto chunks = [](const Buffer& bytes) {
+        common::ByteReader reader(bytes.data(), bytes.size());
+        reader.take(8);
+        return reader.take(reader.u64()).u32();
+    };
+    check(chunks(two) == 2 && chunks(four) == 4 && serial != two, "opt-in SZ3 chunk count");
+    check(encode(0, true) == encode(previous_threads, true), "default thread request");
+#else
+    check(two == serial && four == serial, "serial-only build generated chunked output");
+#endif
+    auto other = std::async(std::launch::async, [&] { return encode(2, true); });
+    check(encode(4, true) == four && other.get() == two, "concurrent SZ3 calls interfered");
+
+    const auto bytes = data.size() * sizeof(float);
+    std::vector<float> reference(data.size()), out(data.size());
+    core.decompress(view(four), {}, DType::Float32, shape, 1, reference.data(), bytes);
+    for (std::size_t i = 0; i < data.size(); ++i)
+        check(std::abs(static_cast<double>(reference[i]) - data[i]) <= .01, "chunked SZ3 exceeded bound");
+    for (int workers : {0, 2, 4}) {
+        std::fill(out.begin(), out.end(), 17);
+        core.decompress(view(four), {}, DType::Float32, shape, workers, out.data(), bytes);
+        check(!std::memcmp(out.data(), reference.data(), bytes), "chunked decode depends on thread count");
+    }
+#ifdef _OPENMP
+    check(previous_threads == omp_get_max_threads() && previous_levels == omp_get_max_active_levels(),
+          "SZ3 changed caller's OpenMP settings");
+#endif
+}
 }  // namespace
 
 int main() {
@@ -114,6 +164,7 @@ int main() {
         matrix<float>(core);
         matrix<double>(core);
         check_arguments(core);
+        thread_modes(core);
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';
         return 1;

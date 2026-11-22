@@ -4,6 +4,7 @@
 
 ### M1 SZ3 adapter
 
+- Keep SZ3 streams independent of thread count by default. Support opt-in chunked compression with task-local OpenMP settings and deterministic decoding within the reader's thread budget.
 - Add built-in core lookup and the optional SZ3 adapter to the decode library. Compress float32 and float64 fields with the four planned algorithms and check the stored layout before decoding into caller-owned memory.
 
 ### M1 point-wise plan reporting
