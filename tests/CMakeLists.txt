@@ -118,6 +118,9 @@ target_link_libraries(qoiw_test_plan PRIVATE qoiw_mock_cores QOIW::qoiw)
 add_test(NAME frontend.plan COMMAND qoiw_test_plan)
 find_package(Python3 QUIET COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
+    add_test(NAME reference.numpy COMMAND Python3::Interpreter -B
+        "${CMAKE_CURRENT_SOURCE_DIR}/reference/test_qoi_numpy.py")
+    set_tests_properties(reference.numpy PROPERTIES SKIP_RETURN_CODE 77)
     add_test(NAME frontend.plan_json COMMAND Python3::Interpreter
         "${CMAKE_CURRENT_SOURCE_DIR}/unit/frontend/plan_json.py" $<TARGET_FILE:qoiw_test_plan>)
     if(QOIW_BUILD_TOOLS)
