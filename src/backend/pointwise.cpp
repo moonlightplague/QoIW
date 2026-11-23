@@ -117,6 +117,21 @@ std::vector<std::size_t> find_indices(const T* original, const T* decoded, std::
     }
     return indices;
 }
+
+template <class T>
+PointCorrections correct_values(DType dtype, const T* original, T* decoded, std::size_t count,
+                                const ResolvedPointRequest& request, int threads, bool verify_patch) {
+    const auto indices = find_indices(original, decoded, count, request, threads);
+    const auto bytes = count * sizeof(T);
+    PointCorrections result{encode_lossless(dtype, original, bytes, indices), indices.size()};
+    if (verify_patch) {
+        result.restored = apply_lossless(result.lossless, dtype, decoded, bytes);
+    } else {
+        for (auto i : indices) std::memcpy(decoded + i, original + i, sizeof(T));
+    }
+    return result;
+}
+
 std::size_t checked_count(DType dtype, const void* original, const void* decoded, std::size_t array_bytes,
                           const ResolvedPointRequest& request, int threads) {
     const auto width = common::element_bytes(dtype);
@@ -173,15 +188,14 @@ Verification verify_values(const T* original, const T* decoded, std::size_t coun
 }  // namespace
 
 PointCorrections correct_pointwise(DType dtype, const void* original, void* decoded,
-                                   std::size_t array_bytes, const ResolvedPointRequest& request, int threads) {
+                                   std::size_t array_bytes, const ResolvedPointRequest& request, int threads,
+                                   bool verify_patch) {
     const auto count = checked_count(dtype, original, decoded, array_bytes, request, threads);
-    const auto indices = dtype == DType::Float32
-        ? find_indices(static_cast<const float*>(original), static_cast<const float*>(decoded), count, request, threads)
-        : find_indices(static_cast<const double*>(original), static_cast<const double*>(decoded), count, request, threads);
-    PointCorrections result;
-    result.lossless = encode_lossless(dtype, original, array_bytes, indices);
-    result.restored = apply_lossless({result.lossless.data(), result.lossless.size()}, dtype, decoded, array_bytes);
-    return result;
+    return dtype == DType::Float32
+        ? correct_values(dtype, static_cast<const float*>(original), static_cast<float*>(decoded),
+                         count, request, threads, verify_patch)
+        : correct_values(dtype, static_cast<const double*>(original), static_cast<double*>(decoded),
+                         count, request, threads, verify_patch);
 }
 
 Verification verify_pointwise(DType dtype, const void* original, const void* decoded,

@@ -77,6 +77,7 @@ struct Request {
 | `frontend.search.refine_rounds` | 4 | Geometric refinement rounds. |
 | `frontend.search.tie_bytes` | 0.025 | Near-tie band, relative to the cheapest cost. |
 | `frontend.rare_outlier_share` | 0.1 | In [0, 1]; see [F4](frontend.md#f4-measure-candidates). |
+| `verify_patch` | `false` | Decode and apply the full-field lossless patch during compression. With the default, the encoder copies the original bits directly. |
 
 ## Functions (`qoiw.hpp`)
 
@@ -164,7 +165,7 @@ Wall-clock seconds measured with `std::chrono::steady_clock`.
 | --- | --- |
 | `CompressionTimes::planning` | Frontend, F0 to F6. |
 | `core_encode`, `core_decode` | The full-field core compression and decompression. |
-| `correction` | Backend check and LOSSLESS encoding and application. |
+| `correction` | Backend check, LOSSLESS encoding, and either direct restoration or patch readback with `verify_patch`. |
 | `container` | Assembling the in-memory container. |
 | `verification` | The report's check of the corrected reconstruction (only with a report). |
 | `total` | The whole `compress` call. At least the sum of the stages; the difference is buffer allocation and bookkeeping. |

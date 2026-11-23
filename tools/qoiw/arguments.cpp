@@ -107,6 +107,7 @@ void add_compression_options(CLI::App& app, Arguments& args) {
     }, "Supply a bound and bypass tuning")->take_last();
     app.add_flag("--allow-stream-changing-parallelism", args.options.allow_stream_changing_parallelism,
                  "Allow the compressor to vary its stream with the thread count");
+    app.add_flag("--verify-patch", args.options.verify_patch, "Apply the encoded correction layer during compression");
     app.add_flag("-a,--verify", args.check_decode, "Decode and check the finished stream before writing");
     app.add_flag("-v,--verbose", args.verbose, "Include all search trials in the text report");
 }

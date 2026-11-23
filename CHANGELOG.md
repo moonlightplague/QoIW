@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Opt-in patch verification
+
+- Restore original bits directly during compression by default. Use `--verify-patch` or `Options::verify_patch` to read back the encoded corrections during compression. Both modes produce the same stream.
+
 ### QPET timing parity
 
 - Use the in-memory codec call for the CLI compression and decompression totals and throughput. Display file I/O and the optional `-a` decode and verify timings separately from those totals.
