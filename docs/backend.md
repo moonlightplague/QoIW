@@ -27,11 +27,15 @@ the reconstructions per expression.
 ## Correction
 
 `correct_pointwise` collects the flagged indices in increasing order, encodes
-the LOSSLESS layer from the original bits (`encode_lossless`), then applies
-that encoded layer to the reconstruction with `apply_lossless`, the function
-the decoder uses. After the call the reconstruction holds exactly the values a
-reader will decode, and `restored` is the number of values written. Restoring
-the original bits satisfies every check, so one pass suffices.
+the LOSSLESS layer from the original bits (`encode_lossless`), and copies
+those bits directly into the reconstruction. The encoder and decoder restore
+the same original bits at the same indices. `restored` is the number of values
+written.
+
+`--verify-patch` (`Options::verify_patch` in C++) makes the encoder apply
+the full-field LOSSLESS layer using `apply_lossless`, the same function a
+reader uses. Both paths emit the same encoded bytes. Sample measurements
+price the encoded patches and score the directly corrected values.
 
 Only lossless corrections exist in this version. Quantised residuals (plan
 section 9.2) and the region passes are later milestones.

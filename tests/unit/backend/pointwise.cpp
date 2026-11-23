@@ -20,9 +20,13 @@ void check_case(const std::vector<T>& original, std::vector<T> decoded, const Re
     auto expected = decoded;
     for (auto i : expected_indices) std::memcpy(&expected.at(i), &original.at(i), sizeof(T));
     const auto dtype = std::is_same_v<T, float> ? DType::Float32 : DType::Float64;
+    auto readback = decoded;
     const auto result = correct_pointwise(dtype, original.data(), decoded.data(), bytes, request, 1);
     if (result.restored != expected_indices.size() || result.lossless.empty() != expected_indices.empty() ||
         std::memcmp(decoded.data(), expected.data(), bytes) != 0) throw std::runtime_error("wrong point corrections");
+    const auto checked = correct_pointwise(dtype, original.data(), readback.data(), bytes, request, 1, true);
+    if (checked.restored != result.restored || checked.lossless != result.lossless ||
+        std::memcmp(readback.data(), decoded.data(), bytes) != 0) throw std::runtime_error("patch readback differs");
 }
 
 void boundaries() {

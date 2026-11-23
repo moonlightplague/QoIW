@@ -86,12 +86,19 @@ def round_trip_f32(root):
     raw.write_bytes(source)
     request = ["-q", "x^2\n", "-m", "REL", ".01", "-q", "x > 0", "-m", "ABS", "0",
                "-M", "ABS", ".15", "-X", "x == 0 or x > 1e30"]
-    plan = read_json("compress", "-c", "sz3", "-f", "-2", 11, 7, "-i", raw, "-z", blob,
-                     "-t", 2, "--fixed-bound", ".5", "--core-option", "algo=nopred", *request, "-a")
+    compress = ["compress", "-c", "sz3", "-f", "-2", 11, 7, "-i", raw,
+                "-t", 2, "--fixed-bound", ".5", "--core-option", "algo=nopred", *request]
+    plan = read_json(*compress, "-z", blob, "-a")
     assert plan["report"]["plan"]["shortcut_reason"] == "fixed_bound"
     assert plan["report"]["restored"] > 0
     assert plan["report"]["verification"]["ok"] and plan["post_decode"]["ok"]
     check_compression_runtime(plan, checked=True)
+    checked_blob = root / "checked-patch.qoiw"
+    checked = read_json(*compress, "-z", checked_blob, "--verify-patch")
+    assert checked["report"]["verification"] == plan["report"]["verification"]
+    assert checked_blob.read_bytes() == blob.read_bytes()
+    check_compression_runtime(checked, checked=False)
+
     header = read_json("inspect", "-z", blob)
     assert header == plan["report"]["stream"]
     assert header["shape"] == [7, 11] and header["dtype"] == "float32" and header["num"] == 77

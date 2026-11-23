@@ -40,6 +40,7 @@ struct Options {
     bool allow_stream_changing_parallelism = false;
     std::optional<double> fixed_bound;
     FrontendOptions frontend;
+    bool verify_patch = false;  // Read back the full-field correction layer during compression.
 };
 
 }  // namespace qoiw

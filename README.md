@@ -80,7 +80,7 @@ API reference: [docs/api.md](docs/api.md).
 ```
 qoiw compress   (-f|-d) (--shape N[,N...] | -1 .. -4 extents) -i FILE [targets] [-M ...] [-X PRED]
                 [-c CORE] [--core-option NAME=VALUE]... [--fixed-bound B]
-                [--allow-stream-changing-parallelism] [-z FILE] [-a] [-v] [-t N] [--json]
+                [--allow-stream-changing-parallelism] [--verify-patch] [-z FILE] [-a] [-v] [-t N] [--json]
 qoiw decompress -z FILE -o FILE [-t N] [--json]
 qoiw inspect    -z FILE [--json]
 qoiw verify     (-f|-d) (--shape ... | -1 .. -4 ...) -i FILE -o FILE [targets] [-M ...] [-X PRED] [-t N] [--json]
@@ -121,6 +121,7 @@ predicate. A constant or empty range makes the fraction an absolute value.
 | `--core-option NAME=VALUE` | Option for the core. SZ3: `algo=interp_lorenzo` (default), `interp`, `lorenzo_reg` or `nopred`. |
 | `--fixed-bound B` | Give the core this absolute bound instead of tuning one. All requirements are still enforced. |
 | `--allow-stream-changing-parallelism` | Let SZ3 use its chunked OpenMP mode, whose stream depends on the thread count. |
+| `--verify-patch` | `compress` applies the encoded lossless patch before checking the corrected field. By default, it restores the original values directly. |
 | `-z`, `--stream FILE` | Container to write (`compress`) or read. Without it, `compress` only measures. |
 | `-o`, `--output FILE` | `decompress`: raw file to write, little-endian, C order. |
 | `-a`, `--verify` | `compress`: decode the finished container and check it again before writing. |

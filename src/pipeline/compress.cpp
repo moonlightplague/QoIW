@@ -40,21 +40,23 @@ auto call_core(Work work) {
 
 template <class T>
 backend::PointCorrections correct_field(const Core& core, const CoreOutput& payload, const ArrayView& input,
-                                        std::size_t bytes, const ResolvedPointRequest& request, int threads,
+                                        std::size_t bytes, const ResolvedPointRequest& request, const Options& options,
                                         CompressionTimes& timings, Verification* verification,
                                         std::vector<std::uint8_t>* verified) {
     auto start = Clock::now();
     std::vector<T> decoded(bytes / sizeof(T));
     call_core([&] {
-        core.decompress(payload.stream, payload.decode_params, input.dtype, input.dims, threads, decoded.data(), bytes);
+        core.decompress(payload.stream, payload.decode_params, input.dtype, input.dims,
+                        options.threads, decoded.data(), bytes);
     });
     timings.core_decode = seconds_since(start);
     start = Clock::now();
-    auto corrections = backend::correct_pointwise(input.dtype, input.data, decoded.data(), bytes, request, threads);
+    auto corrections = backend::correct_pointwise(input.dtype, input.data, decoded.data(), bytes, request,
+                                                  options.threads, options.verify_patch);
     timings.correction = seconds_since(start);
     if (verification) {
         start = Clock::now();
-        *verification = backend::verify_pointwise(input.dtype, input.data, decoded.data(), bytes, request, threads);
+        *verification = backend::verify_pointwise(input.dtype, input.data, decoded.data(), bytes, request, options.threads);
         timings.verification = seconds_since(start);
     }
     if (verified) {
@@ -99,8 +101,8 @@ std::vector<std::uint8_t> pipeline::compress_field(const ArrayView& input, const
     result.seconds.core_encode = seconds_since(start);
     auto* verification = report ? &result.verification : nullptr;
     auto corrections = input.dtype == DType::Float32
-        ? correct_field<float>(core, payload, input, bytes, resolved, params.threads, result.seconds, verification, verified)
-        : correct_field<double>(core, payload, input, bytes, resolved, params.threads, result.seconds, verification, verified);
+        ? correct_field<float>(core, payload, input, bytes, resolved, options, result.seconds, verification, verified)
+        : correct_field<double>(core, payload, input, bytes, resolved, options, result.seconds, verification, verified);
     result.restored = corrections.restored;
 
     start = Clock::now();

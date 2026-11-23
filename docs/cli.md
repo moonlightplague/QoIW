@@ -16,6 +16,11 @@ what they print, and how they handle files. The implementation is in
 | `verify` | Reads two raw files, calls `qoiw::verify`, prints the checks and runtime. |
 | `cores` | Prints a table of the built-in cores: version, format, and the traits per type and range of ranks. |
 
+`compress` restores the original values at flagged indices by default.
+`--verify-patch` uses the encoded lossless patch to restore those values
+before the encoder check. `-a` decodes and verifies the finished container.
+Either flag can be used on its own or together with the other.
+
 ## Text reports
 
 Every report starts with the command and its files, continues with titled
@@ -110,7 +115,7 @@ below the total without a percentage share.
 | `compress` | read input | reading and byte-order conversion of the raw file |
 | | frontend (tuning) | `CompressionTimes::planning`: F0 to F6 |
 | | core: compress, decompress | `core_encode` and `core_decode`: the full-field core calls |
-| | backend (check and correct, assemble container) | `correction` repairs the field. `container` assembles the stream in memory. |
+| | backend (check and correct, assemble container) | `correction` repairs the field and includes patch readback with `--verify-patch`. `container` assembles the stream in memory. |
 | | encoder check | `verification`, the report's check of the corrected reconstruction |
 | | decode container (-a), verify decoded (-a) | `qoiw::decompress` and `qoiw::verify` on the finished container |
 | | write stream | staging and renaming the container, when it is written |

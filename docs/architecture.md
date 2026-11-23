@@ -58,9 +58,10 @@ The guarantee rests on four properties of the code, which a change must keep.
 1. The backend checks the reconstruction that the core actually produced,
    in the storage type, and restores every failing value from the original
    bits. The prior, the sample and the search never decide correctness.
-2. The encoder computes the final values by decoding its own LOSSLESS
-   payload into the reconstruction (`apply_lossless`), the same function the
-   decoder runs. What it checks is what a reader gets.
+2. The LOSSLESS codec preserves each correction's index and original bits.
+   The encoder and decoder use those same indices and bits to repair the
+   reconstruction. `Options::verify_patch` also lets the encoder validate and
+   apply the payload with the decoder's `apply_lossless` function.
 3. A restored value is a copy of the original bits, so the correction pass
    cannot fail to terminate or create new violations.
 4. The core's decompression is deterministic for a given stream. The SZ3
