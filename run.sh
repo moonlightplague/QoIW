@@ -9,13 +9,13 @@ DECOMPRESS_OUTPUT="output/Hurricane-Dataset-for-Compressors/CLOUDf48.bin.f32.out
 #compress
 mkdir -p "$(dirname "$COMPRESS_OUTPUT")"
 ./build/qoiw compress -f \
-    --shape 500,500,100 -i "$INPUT" \
+    --shape 100,500,500 -i "$INPUT" \
     -q 'x^2' -m REL 1e-3 \
     -z "$COMPRESS_OUTPUT" \
-    -t $WORKERS -a
+    -t $WORKERS
 
 #decompress
-mkdir -p "$(dirname "$DECOMPRESS_OUTPUT")"
-./build/qoiw decompress \
-    -z "$COMPRESS_OUTPUT" \
-    -o "$DECOMPRESS_OUTPUT"
+#mkdir -p "$(dirname "$DECOMPRESS_OUTPUT")"
+#./build/qoiw decompress \
+#    -z "$COMPRESS_OUTPUT" \
+#    -o "$DECOMPRESS_OUTPUT"
