@@ -61,24 +61,23 @@ Verification
 
 Runtime
   Stage                              ms     share
-  read input                      50.23     5.9 %
-  frontend (tuning)              165.54    19.6 %
-  core                           412.23    48.7 %
-    compress                     279.20    33.0 %
-    decompress                   133.03    15.7 %
-  backend                         19.11     2.3 %
-    check and correct             19.03     2.2 %
-    write container                0.09     0.0 %
-  verification                   133.76    15.8 %
-    encoder check                  6.26     0.7 %
-    decode container             109.10    12.9 %
-    verify decoded                18.40     2.2 %
-  write stream                     0.45     0.1 %
-  other (buffers, bookkeeping)    64.41     7.6 %
-  total                          845.73   100.0 %
+  frontend (tuning)              154.88    26.3 %
+  core                           402.75    68.5 %
+    compress                     272.85    46.4 %
+    decompress                   129.90    22.1 %
+  backend                         16.07     2.7 %
+    check and correct             16.02     2.7 %
+    assemble container             0.05     0.0 %
+  encoder check                    4.19     0.7 %
+  other (buffers, bookkeeping)      9.94     1.7 %
+  total                          587.83   100.0 %
+  read input                      49.45
+  write stream                     0.81
+  decode container (-a)          116.86
+  verify decoded (-a)             16.82
 
 ------------------------------------------------------------------------
-==>   Compression ratio 92.76   Total time 845.7 ms (118.2 MB/s)   PASSED
+==>   Compression ratio 92.76   Total time 587.8 ms (170.1 MB/s)   PASSED
 ```
 
 ### Sections
@@ -101,19 +100,26 @@ input, the request, the checks and its runtime, and ends with `PASSED` or
 
 ### Runtime stages
 
+The compression and decompression totals measure the in-memory codec calls,
+using the same boundaries as QPET's reported compression and decompression
+times. File I/O and the optional `compress -a` decode and verification appear
+below the total without a percentage share.
+
 | Command | Stage | Measured as |
 | --- | --- | --- |
 | `compress` | read input | reading and byte-order conversion of the raw file |
 | | frontend (tuning) | `CompressionTimes::planning`: F0 to F6 |
 | | core: compress, decompress | `core_encode` and `core_decode`: the full-field core calls |
-| | backend: check and correct, write container | `correction` and `container` |
-| | verification: encoder check | `verification`: the report's check of the corrected reconstruction |
-| | verification: decode container, verify decoded | `-a` only: `qoiw::decompress` and `qoiw::verify` on the finished container |
+| | backend (check and correct, assemble container) | `correction` repairs the field. `container` assembles the stream in memory. |
+| | encoder check | `verification`, the report's check of the corrected reconstruction |
+| | decode container (-a), verify decoded (-a) | `qoiw::decompress` and `qoiw::verify` on the finished container |
 | | write stream | staging and renaming the container, when it is written |
-| `decompress` | read stream; decompress (parse container, core decompress, apply corrections); write output | the stages of `DecompressionTimes` between file reading and writing |
-| `verify` | read inputs; verify | |
-| all | other (buffers, bookkeeping) | the total minus the top-level stages: mostly allocating and zero-filling the output and check buffers |
-| all | total | the command from before reading its input to after writing its output; printing is excluded |
+| | total | `CompressionTimes::total` covers the `qoiw::compress` call. |
+| `decompress` | read stream, write output | reading the compressed file and writing the raw field, including output byte-order conversion |
+| | parse container, core decompress, apply corrections | `DecompressionTimes` stages |
+| | total | `DecompressionTimes::total` covers the `qoiw::decompress` call, timed after inspection and output buffer allocation. |
+| `verify` | read inputs, verify, total | reading both raw files, verifying the fields, and the full command up to report printing |
+| all | other (buffers, bookkeeping) | the total minus the stages counted towards it |
 
 Throughput in the summary is the raw field size divided by the total.
 
@@ -137,13 +143,13 @@ With `--json`:
 
 The objects are the serializations described in the [C++ API](api.md#results-reporthpp).
 `report.plan` includes the full trace regardless of `-v`, and
-`report.seconds` holds the library's stage times. The `runtime` objects hold
-the command's own times in seconds:
+`report.seconds` holds the library's stage times. The `runtime` objects
+report codec and ancillary timings in seconds.
 
 | Command | `runtime` fields |
 | --- | --- |
-| `compress` | `read_input`, `compress` (= `report.seconds.total`), `post_decode` (`{"decompress": DecompressionTimes, "verify": s}` with `-a`, else `null`), `write_stream` (`null` when nothing was written), `total` |
-| `decompress` | `read_stream`, `decompress` (`DecompressionTimes`: `parse`, `core_decode`, `correction`, `total`), `write_output`, `total` |
+| `compress` | `read_input`, `compress` (= `report.seconds.total`), `post_decode` (`{"decompress": DecompressionTimes, "verify": s}` with `-a`, else `null`), `write_stream` (`null` when nothing was written), `total` (= `compress`) |
+| `decompress` | `read_stream`, `decompress` (`DecompressionTimes`: `parse`, `core_decode`, `correction`, `total`), `write_output`, `total` (= `decompress.total`) |
 
 Before this change `decompress --json` printed the bare `StreamInfo`; read it
 from `stream` now.

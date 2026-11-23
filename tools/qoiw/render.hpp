@@ -9,9 +9,9 @@
 
 namespace qoiw::cli {
 
-// Wall-clock seconds the compress command spent outside qoiw::compress, and in total.
+// Wall-clock seconds the compress command spent outside qoiw::compress.
 struct CompressionRun {
-    double read_input = 0, write_stream = 0, total = 0;
+    double read_input = 0, write_stream = 0;
     bool written = false;
     // The -a check: decoding the finished container, then verifying it.
     std::optional<DecompressionTimes> check_decode;
@@ -19,7 +19,7 @@ struct CompressionRun {
 };
 
 struct DecompressionRun {
-    double read_stream = 0, write_output = 0, total = 0;
+    double read_stream = 0, write_output = 0;
     DecompressionTimes decode;
 };
 

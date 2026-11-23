@@ -42,7 +42,6 @@ int with_storage_type(DType dtype, Work work) {
 
 template <class T>
 int compress_field(const Arguments& args, Console& console) {
-    const auto start = Clock::now();
     CompressionRun run;
     check_distinct_files(args.input, args.stream);
     const auto bytes = common::array_bytes(*args.dtype, args.dims);
@@ -65,7 +64,6 @@ int compress_field(const Arguments& args, Console& console) {
         timed(run.write_stream, [&] { write_file(args.stream, stream.data(), stream.size()); });
         run.written = true;
     }
-    run.total = seconds_since(start);
     if (args.json) std::cout << compression_json(report, post_decode, run) << '\n';
     else print_compression(console, args, report, post_decode, run);
     return ok ? 0 : violations_exit;
@@ -90,7 +88,6 @@ int verify_fields(const Arguments& args, Console& console) {
 }
 
 int decompress_file(const Arguments& args, Console& console) {
-    const auto start = Clock::now();
     DecompressionRun run;
     check_distinct_files(args.stream, args.output);
     const auto stream = timed(run.read_stream, [&] { return read_container(args.stream); });
@@ -108,7 +105,6 @@ int decompress_file(const Arguments& args, Console& console) {
         });
         return 0;
     });
-    run.total = seconds_since(start);
     if (args.json) std::cout << decompression_json(info, run) << '\n';
     else print_decompression(console, args, info, run);
     return 0;
