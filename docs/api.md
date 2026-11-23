@@ -165,7 +165,7 @@ Wall-clock seconds measured with `std::chrono::steady_clock`.
 | `CompressionTimes::planning` | Frontend, F0 to F6. |
 | `core_encode`, `core_decode` | The full-field core compression and decompression. |
 | `correction` | Backend check and LOSSLESS encoding and application. |
-| `container` | Writing the container. |
+| `container` | Assembling the in-memory container. |
 | `verification` | The report's check of the corrected reconstruction (only with a report). |
 | `total` | The whole `compress` call. At least the sum of the stages; the difference is buffer allocation and bookkeeping. |
 | `DecompressionTimes::parse` | Parsing and validating the container header and sections. |
