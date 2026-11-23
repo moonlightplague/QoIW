@@ -65,10 +65,17 @@ class RuntimeTable {
         table_.row({name, time(seconds), share(seconds)}, depth, depth ? Emphasis::Dim : Emphasis::None);
     }
 
-    void print(Console& console, const std::string& total_label) {
+    void add_total() {
         const double other = std::max(0., total_ - accounted_);
         table_.row({"other (buffers, bookkeeping)", time(other), share(other)}, 0, Emphasis::Dim);
-        table_.row({total_label, time(total_), share(total_)}, 0, Emphasis::Bold);
+        table_.row({"total", time(total_), share(total_)}, 0, Emphasis::Bold);
+    }
+
+    void outside_total(const std::string& name, double seconds) {
+        table_.row({name, time(seconds), ""}, 0, Emphasis::Dim);
+    }
+
+    void print(Console& console) const {
         console.section("Runtime");
         table_.print(console);
     }
@@ -269,27 +276,26 @@ void print_compression(Console& console, const Arguments& args, const Report& re
     if (args.verbose) print_trace(console, plan);
 
     const auto& seconds = report.seconds;
-    RuntimeTable runtime(run.total);
-    runtime.stage("read input", run.read_input);
+    RuntimeTable runtime(seconds.total);
     runtime.stage("frontend (tuning)", seconds.planning);
     runtime.stage("core", seconds.core_encode + seconds.core_decode);
     runtime.stage("compress", seconds.core_encode, 1);
     runtime.stage("decompress", seconds.core_decode, 1);
     runtime.stage("backend", seconds.correction + seconds.container);
     runtime.stage("check and correct", seconds.correction, 1);
-    runtime.stage("write container", seconds.container, 1);
-    double check = run.check_decode ? run.check_decode->total + run.check_verify : 0;
-    runtime.stage("verification", seconds.verification + check);
-    runtime.stage("encoder check", seconds.verification, 1);
+    runtime.stage("assemble container", seconds.container, 1);
+    runtime.stage("encoder check", seconds.verification);
+    runtime.add_total();
+    runtime.outside_total("read input", run.read_input);
+    if (run.written) runtime.outside_total("write stream", run.write_stream);
     if (run.check_decode) {
-        runtime.stage("decode container", run.check_decode->total, 1);
-        runtime.stage("verify decoded", run.check_verify, 1);
+        runtime.outside_total("decode container (-a)", run.check_decode->total);
+        runtime.outside_total("verify decoded (-a)", run.check_verify);
     }
-    if (run.written) runtime.stage("write stream", run.write_stream);
-    runtime.print(console, "total");
+    runtime.print(console);
 
     console.summary({ratio_item(console, raw / static_cast<double>(info.stream_bytes)),
-                     "Total time " + console.accent(seconds_text(run.total)) + throughput(raw, run.total),
+                     "Total time " + console.accent(seconds_text(seconds.total)) + throughput(raw, seconds.total),
                      status(console, ok)});
 }
 
@@ -307,7 +313,7 @@ std::string compression_json(const Report& report, const std::optional<Verificat
         out << "null";
     }
     out << ",\"write_stream\":" << (run.written ? json_number(run.write_stream) : "null")
-        << ",\"total\":" << json_number(run.total) << "}}";
+        << ",\"total\":" << json_number(report.seconds.total) << "}}";
     return out.str();
 }
 
@@ -317,25 +323,26 @@ void print_decompression(Console& console, const Arguments& args, const StreamIn
     console.section("Stream");
     print_stream_details(console, info);
 
-    RuntimeTable runtime(run.total);
-    runtime.stage("read stream", run.read_stream);
-    runtime.stage("decompress", run.decode.total);
-    runtime.stage("parse container", run.decode.parse, 1);
-    runtime.stage("core decompress", run.decode.core_decode, 1);
-    runtime.stage("apply corrections", run.decode.correction, 1);
-    runtime.stage("write output", run.write_output);
-    runtime.print(console, "total");
+    const auto& seconds = run.decode;
+    RuntimeTable runtime(seconds.total);
+    runtime.stage("parse container", seconds.parse);
+    runtime.stage("core decompress", seconds.core_decode);
+    runtime.stage("apply corrections", seconds.correction);
+    runtime.add_total();
+    runtime.outside_total("read stream", run.read_stream);
+    runtime.outside_total("write output", run.write_output);
+    runtime.print(console);
 
     const auto raw = static_cast<std::uint64_t>(info.num) * info.fields.size() * value_bytes(info.dtype);
     console.summary({ratio_item(console, ratio(info)),
-                     "Total time " + console.accent(seconds_text(run.total)) + throughput(raw, run.total)});
+                     "Total time " + console.accent(seconds_text(seconds.total)) + throughput(raw, seconds.total)});
 }
 
 std::string decompression_json(const StreamInfo& info, const DecompressionRun& run) {
     std::ostringstream out;
     out << "{\"stream\":" << info.to_json() << ",\"runtime\":{\"read_stream\":" << json_number(run.read_stream)
         << ",\"decompress\":" << run.decode.to_json() << ",\"write_output\":" << json_number(run.write_output)
-        << ",\"total\":" << json_number(run.total) << "}}";
+        << ",\"total\":" << json_number(run.decode.total) << "}}";
     return out.str();
 }
 
@@ -360,7 +367,8 @@ void print_verification(Console& console, const Arguments& args, const Verificat
     RuntimeTable runtime(run.total);
     runtime.stage("read inputs", run.read_inputs);
     runtime.stage("verify", run.verify);
-    runtime.print(console, "total");
+    runtime.add_total();
+    runtime.print(console);
 
     console.summary({status(console, result.ok()), group_digits(result.violating_values) + " of " +
                                                        group_digits(result.values) + " values violate a requirement",

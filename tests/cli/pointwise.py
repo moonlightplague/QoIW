@@ -28,15 +28,15 @@ def check_compression_runtime(result, checked):
     stages = ("planning", "core_encode", "core_decode", "correction", "container", "verification")
     assert all(seconds[name] >= 0 for name in stages)
     assert seconds["total"] >= sum(seconds[name] for name in stages)
-    assert runtime["compress"] == seconds["total"]
+    assert runtime["total"] == runtime["compress"] == seconds["total"]
+    assert runtime["read_input"] >= 0
+    assert runtime["write_stream"] is None or runtime["write_stream"] >= 0
     check = runtime["post_decode"]
     assert (check is not None) == checked
-    parts = runtime["read_input"] + runtime["compress"] + (runtime["write_stream"] or 0)
-    if check:
+    if check is not None:
         decode = check["decompress"]
         assert decode["total"] >= decode["parse"] + decode["core_decode"] + decode["correction"]
-        parts += decode["total"] + check["verify"]
-    assert runtime["total"] >= parts
+        assert check["verify"] >= 0
 
 
 def check_decompression_runtime(result):
@@ -44,7 +44,17 @@ def check_decompression_runtime(result):
     decode = runtime["decompress"]
     assert min(decode.values()) >= 0
     assert decode["total"] >= decode["parse"] + decode["core_decode"] + decode["correction"]
-    assert runtime["total"] >= runtime["read_stream"] + decode["total"] + runtime["write_output"]
+    assert runtime["total"] == decode["total"]
+    assert runtime["read_stream"] >= 0 and runtime["write_output"] >= 0
+
+
+def check_outside_total(text, *stages):
+    runtime = text.split("\nRuntime\n", 1)[1]
+    total_row, *extra_rows = runtime.split("\n  total", 1)[1].splitlines()
+    assert "%" in total_row
+    for stage in stages:
+        row = next(row for row in extra_rows if row.strip().startswith(stage))
+        assert "%" not in row
 
 
 def text_reports(root, raw, blob, decoded, request):
@@ -57,10 +67,12 @@ def text_reports(root, raw, blob, decoded, request):
     assert "\033[" not in text and "\033[" not in cli(*compress, "--color", "auto")
     assert "\033[1;36m" in cli(*compress, "--color", "always")
     cli(*compress, "--color", "sometimes", status=1)
-    checked = cli(*compress, "-a", "-v")
-    assert "on decode (-a)" in checked and "decode container" in checked and "Measured bounds (" in checked
+    checked = cli(*compress, "-a", "-v", "-z", root / "report.qoiw")
+    assert "on decode (-a)" in checked and "Measured bounds (" in checked
+    check_outside_total(checked, "read input", "write stream", "decode container (-a)", "verify decoded (-a)")
     text = cli("decompress", "-z", blob, "-o", decoded)
     assert "core decompress" in text and "Compression ratio" in text and "Total time" in text
+    check_outside_total(text, "read stream", "write output")
     text = cli("inspect", "-z", blob, "--color", "never")
     assert "Compression ratio" in text and "Total time" not in text
     text = cli("verify", "-f", "--shape", "7,11", "-i", raw, "-o", decoded, *request)
@@ -123,7 +135,9 @@ def round_trip_f64(root):
     assert "Measured bounds (" in cli("compress", *options)
     result = read_json("compress", *options, f"--stream={blob}", "-av")
     check_compression_runtime(result, checked=True)
-    assert read_json("compress", *options)["runtime"]["write_stream"] is None
+    unsaved = read_json("compress", *options)
+    check_compression_runtime(unsaved, checked=False)
+    assert unsaved["runtime"]["write_stream"] is None
     report = result["report"]
     assert report["stream"]["shape"] == [3, 4, 8] and report["stream"]["dtype"] == "float64"
     assert report["plan"]["trace"] and result["post_decode"]["ok"]

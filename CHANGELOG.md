@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### QPET timing parity
+
+- Use the in-memory codec call for the CLI compression and decompression totals and throughput. Display file I/O and the optional `-a` decode and verify timings separately from those totals.
+
 ### Readable CLI reports and runtime breakdown
 
 - Document the report sections, runtime stages, colour handling and JSON `runtime` objects in `docs/cli.md`, the timing types in `docs/api.md`, and `--color` in the README.
